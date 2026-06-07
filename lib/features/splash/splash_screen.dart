@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
-/// Splash screen — fades into the shell after a short delay.
+/// Splash screen — attempts to play hand.lottie; falls back to a static
+/// gradient logo if the composition fails to parse (e.g. 0-frame dotLottie).
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -12,93 +14,133 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fade;
-  late Animation<double> _scale;
+  // Drives the text + logo fade-in for both the Lottie and fallback paths
+  late AnimationController _fadeCtrl;
+  late Animation<double> _textFade;
+  late Animation<double> _textSlide;
+
+  LottieComposition? _composition; // non-null → Lottie rendered successfully
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+
+    _fadeCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 700),
     );
 
-    _fade = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0, 0.6, curve: Curves.easeOut),
-      ),
-    );
-    _scale = Tween<double>(begin: 0.82, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    _textFade = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut),
     );
 
-    _controller.forward().then((_) async {
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.shell);
+    _textSlide = Tween<double>(begin: 18, end: 0).animate(
+      CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOutCubic),
+    );
+
+    // ── Fixed 3-second splash ───────────────────────────────────────────────
+    // Navigation always fires at the 3s mark, regardless of Lottie load time.
+    Future<void>.delayed(
+      const Duration(seconds: 3),
+      () { if (mounted) Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding); },
+    );
+
+    // Text slides up at 1.5 s so it fills the second half of the splash.
+    Future<void>.delayed(
+      const Duration(milliseconds: 1500),
+      () { if (mounted) _fadeCtrl.forward(); },
+    );
+
+    _loadLottie();
+  }
+
+  Future<void> _loadLottie() async {
+    try {
+      final comp = await AssetLottie('assets/hand.json').load();
+
+      // Guard against the 0-frame case without crashing
+      if (comp.startFrame == comp.endFrame) {
+        throw Exception('hand.json has zero frames — skipping Lottie.');
       }
-    });
+
+      if (!mounted) return;
+      setState(() => _composition = comp);
+    } catch (_) {
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _fadeCtrl.dispose();
     super.dispose();
   }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: AnimatedBuilder(
-        animation: _controller,
-        builder: (_, __) => Center(
-          child: FadeTransition(
-            opacity: _fade,
-            child: ScaleTransition(
-              scale: _scale,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo mark
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: AppColors.accentGradient,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.accent.withOpacity(0.4),
-                          blurRadius: 32,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Hero area ──────────────────────────────────────────────────
+            if (_composition != null)
+              // ✅ Lottie loaded successfully
+              Lottie(
+                composition: _composition!,
+                width: 220,
+                height: 220,
+                repeat: false,
+                delegates: LottieDelegates(
+                  values: [
+                    ValueDelegate.color(
+                      const ['**'],
+                      value: AppColors.accent,
                     ),
-                    child: const Icon(
-                      Icons.spatial_audio_off_rounded,
-                      color: Colors.white,
-                      size: 40,
-                    ),
+                  ],
+                ),
+              )
+            else
+              // ⏳ Loading — show a small spinner
+              const SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.accent,
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            // ── App name + tagline ─────────────────────────────────────────
+            AnimatedBuilder(
+              animation: _fadeCtrl,
+              builder: (_, _) => Transform.translate(
+                offset: Offset(0, _textSlide.value),
+                child: Opacity(
+                  opacity: _textFade.value,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Spartial Touch',
+                        style: AppTextTheme.textTheme.headlineMedium!
+                            .copyWith(letterSpacing: -0.5),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Feel the space.',
+                        style: AppTextTheme.textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Spartial Touch',
-                    style: AppTextTheme.textTheme.headlineMedium!.copyWith(
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Feel the space.',
-                    style: AppTextTheme.textTheme.bodyMedium,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
+          ],
         ),
       ),
     );

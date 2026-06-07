@@ -11,6 +11,7 @@ import '../../features/shell/shell_screen.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/item_detail/item_detail_screen.dart';
+import '../../features/onboarding/onboarding_screen.dart';
 
 /// Builds the [MaterialApp.onGenerateRoute] route table.
 ///
@@ -21,6 +22,7 @@ abstract final class AppRouter {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     return switch (settings.name) {
       AppRoutes.splash => _fade(const SplashScreen(), settings),
+      AppRoutes.onboarding => _fade(const OnboardingScreen(), settings),
       AppRoutes.shell => _fadeSlide(const ShellScreen(), settings),
       AppRoutes.home => _fadeSlide(const HomeScreen(), settings),
       AppRoutes.search => _fadeSlide(const SearchScreen(), settings),
@@ -40,8 +42,8 @@ abstract final class AppRouter {
         settings: settings,
         transitionDuration: const Duration(milliseconds: 350),
         reverseTransitionDuration: const Duration(milliseconds: 250),
-        pageBuilder: (_, __, ___) => page,
-        transitionsBuilder: (_, anim, __, child) => FadeTransition(
+        pageBuilder: (_, _, _) => page,
+        transitionsBuilder: (_, anim, _, child) => FadeTransition(
           opacity: CurvedAnimation(parent: anim, curve: Curves.easeInOut),
           child: child,
         ),
@@ -53,7 +55,7 @@ abstract final class AppRouter {
         settings: settings,
         transitionDuration: const Duration(milliseconds: 320),
         reverseTransitionDuration: const Duration(milliseconds: 250),
-        pageBuilder: (_, __, ___) => page,
+        pageBuilder: (_, _, _) => page,
         transitionsBuilder: (_, anim, secondaryAnim, child) {
           final curved = CurvedAnimation(
             parent: anim,
@@ -89,8 +91,8 @@ abstract final class AppRouter {
         settings: settings,
         transitionDuration: const Duration(milliseconds: 320),
         reverseTransitionDuration: const Duration(milliseconds: 250),
-        pageBuilder: (_, __, ___) => page,
-        transitionsBuilder: (_, anim, __, child) {
+        pageBuilder: (_, _, _) => page,
+        transitionsBuilder: (_, anim, _, child) {
           final curved = CurvedAnimation(
             parent: anim,
             curve: Curves.easeOutCubic,

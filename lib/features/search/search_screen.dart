@@ -60,7 +60,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: ListView.separated(
                 itemCount: _recentItems.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (ctx, i) {
                   final item = _recentItems[i];
                   return ListTile(

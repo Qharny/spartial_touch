@@ -2,6 +2,7 @@
 abstract final class AppRoutes {
   // ── Root ─────────────────────────────────────────────────────────────────
   static const String splash = '/';
+  static const String onboarding = '/onboarding';
   static const String shell = '/shell';
 
   // ── Top-level ─────────────────────────────────────────────────────────────
