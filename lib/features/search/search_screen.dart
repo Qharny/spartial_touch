@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/theme.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -29,8 +28,9 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Search')),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -65,10 +65,10 @@ class _SearchScreenState extends State<SearchScreen> {
                   final item = _recentItems[i];
                   return ListTile(
                     leading: Icon(item.icon,
-                        color: AppColors.textSecondary, size: 20),
+                        color: cs.onSurfaceVariant, size: 20),
                     title: Text(item.label, style: tt.bodyLarge),
-                    trailing: const Icon(Icons.north_west_rounded,
-                        size: 16, color: AppColors.textDisabled),
+                    trailing: Icon(Icons.north_west_rounded,
+                        size: 16, color: cs.outline),
                     onTap: () => _controller.text = item.label,
                   );
                 },

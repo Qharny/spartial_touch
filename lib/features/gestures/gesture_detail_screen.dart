@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/router/router.dart';
-import '../../core/theme/theme.dart';
 
 class GestureDetailScreen extends StatefulWidget {
   const GestureDetailScreen({super.key});
@@ -14,23 +13,24 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Gesture Detail',
           style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
             fontSize: 16,
-            color: Colors.white,
+            color: cs.onSurface,
           ),
         ),
         centerTitle: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded, color: Colors.white),
+          icon: Icon(Icons.close_rounded, color: cs.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -43,17 +43,17 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
             child: Container(
               height: 220,
               decoration: BoxDecoration(
-                color: const Color(0xFF111118),
+                color: cs.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.outline),
+                border: Border.all(color: cs.outline),
               ),
-              child: const Center(
+              child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.pan_tool_outlined, size: 64, color: Colors.white),
-                    SizedBox(height: 8),
-                    Icon(Icons.keyboard_double_arrow_up_rounded, size: 32, color: Colors.white),
+                    Icon(Icons.pan_tool_outlined, size: 64, color: cs.onSurface),
+                    const SizedBox(height: 8),
+                    Icon(Icons.keyboard_double_arrow_up_rounded, size: 32, color: cs.onSurface),
                   ],
                 ),
               ),
@@ -62,22 +62,22 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
           const SizedBox(height: 24),
 
           // ── Title & Description ─────────────────────────────────────────
-          const Text(
+          Text(
             'Wave Up',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 24,
               fontWeight: FontWeight.w800,
-              color: Colors.white,
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Quick upward motion with an open palm. Hold fingers steady for better detection.',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 14,
-              color: Color(0xFFB0B0C0),
+              color: cs.onSurfaceVariant,
               height: 1.4,
             ),
           ),
@@ -109,18 +109,18 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.outline),
+              border: Border.all(color: cs.outline),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Low', style: TextStyle(fontSize: 12, color: Color(0xFF7A7890))),
-                    Text('High', style: TextStyle(fontSize: 12, color: Color(0xFF7A7890))),
+                    Text('Low', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                    Text('High', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -133,17 +133,17 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
                   child: Slider(
                     value: _sensitivity,
                     onChanged: (v) => setState(() => _sensitivity = v),
-                    activeColor: Colors.white,
-                    inactiveColor: const Color(0xFF2A2A3A),
+                    activeColor: cs.onSurface,
+                    inactiveColor: cs.outline,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'Higher sensitivity makes the gesture easier to trigger but may increase accidental activations.',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
-                    color: Color(0xFFB0B0C0),
+                    color: cs.onSurfaceVariant,
                     height: 1.4,
                   ),
                 ),
@@ -158,14 +158,14 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.outline),
+              border: Border.all(color: cs.outline),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.keyboard_double_arrow_up_rounded, color: Color(0xFF7A7890), size: 20),
-                SizedBox(width: 12),
+                Icon(Icons.keyboard_double_arrow_up_rounded, color: cs.onSurfaceVariant, size: 20),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Scroll Up',
@@ -173,11 +173,11 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
                       fontFamily: 'Inter',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: cs.onSurface,
                     ),
                   ),
                 ),
-                Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF7A7890)),
+                Icon(Icons.keyboard_arrow_down_rounded, color: cs.onSurfaceVariant),
               ],
             ),
           ),
@@ -192,15 +192,15 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.outline),
+                  border: Border.all(color: cs.outline),
                 ),
-                child: const Text(
+                child: Text(
                   'Add App',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: cs.onSurface,
                   ),
                 ),
               ),
@@ -227,17 +227,17 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
             children: [
               Container(
                 width: 8, height: 8,
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFF7A7890))),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: cs.onSurfaceVariant)),
               ),
               const SizedBox(width: 12),
               Container(
                 width: 16, height: 4,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(color: cs.onSurface, borderRadius: BorderRadius.circular(2)),
               ),
               const SizedBox(width: 12),
               Container(
                 width: 8, height: 8,
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFF7A7890))),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: cs.onSurfaceVariant)),
               ),
             ],
           ),
@@ -255,34 +255,36 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: cs.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Space Mono',
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.0,
-              color: Color(0xFF7A7890),
+              color: cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 24,
               fontWeight: FontWeight.w800,
-              color: Colors.white,
+              color: cs.onSurface,
             ),
           ),
         ],
@@ -297,13 +299,15 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'Inter',
         fontSize: 15,
         fontWeight: FontWeight.w700,
-        color: Colors.white,
+        color: cs.onSurface,
       ),
     );
   }
@@ -322,12 +326,14 @@ class _AppOverrideCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: cs.outline),
       ),
       child: Row(
         children: [
@@ -335,10 +341,10 @@ class _AppOverrideCard extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFF111118),
+              color: cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, size: 16, color: Colors.white),
+            child: Icon(icon, size: 16, color: cs.onSurface),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -347,26 +353,26 @@ class _AppOverrideCard extends StatelessWidget {
               children: [
                 Text(
                   appName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   action,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
-                    color: Color(0xFF7A7890),
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF7A7890)),
+          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
         ],
       ),
     );

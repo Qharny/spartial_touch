@@ -18,8 +18,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'SpatialTouch',
@@ -49,10 +50,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Switch(
                     value: _enableVisuals,
                     onChanged: (v) => setState(() => _enableVisuals = v),
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppColors.accent,
-                    inactiveThumbColor: const Color(0xFF7A7890),
-                    inactiveTrackColor: AppColors.surfaceVariant,
+                    activeThumbColor: cs.surface,
+                    activeTrackColor: AppColorsShared.accent,
+                    inactiveThumbColor: cs.onSurfaceVariant,
+                    inactiveTrackColor: cs.surfaceContainerHighest,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -70,8 +71,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Slider(
                       value: _opacity,
                       onChanged: (v) => setState(() => _opacity = v),
-                      activeColor: Colors.white,
-                      inactiveColor: AppColors.outline,
+                      activeColor: cs.onSurface,
+                      inactiveColor: cs.outline,
                     ),
                   ),
                 ),
@@ -97,8 +98,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Slider(
                       value: _haptic,
                       onChanged: (v) => setState(() => _haptic = v),
-                      activeColor: Colors.white,
-                      inactiveColor: AppColors.outline,
+                      activeColor: cs.onSurface,
+                      inactiveColor: cs.outline,
                     ),
                   ),
                 ),
@@ -110,10 +111,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Switch(
                     value: _sounds,
                     onChanged: (v) => setState(() => _sounds = v),
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppColors.accent,
-                    inactiveThumbColor: const Color(0xFF7A7890),
-                    inactiveTrackColor: AppColors.surfaceVariant,
+                    activeThumbColor: cs.surface,
+                    activeTrackColor: AppColorsShared.accent,
+                    inactiveThumbColor: cs.onSurfaceVariant,
+                    inactiveTrackColor: cs.surfaceContainerHighest,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -128,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               _SettingsRow(
                 label: 'Auto-Start Mode',
-                trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF7A7890)),
+                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () {},
               ),
               _SettingsRow(
@@ -138,10 +139,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Switch(
                     value: _dnd,
                     onChanged: (v) => setState(() => _dnd = v),
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppColors.accent,
-                    inactiveThumbColor: const Color(0xFF7A7890),
-                    inactiveTrackColor: AppColors.surfaceVariant,
+                    activeThumbColor: cs.surface,
+                    activeTrackColor: AppColorsShared.accent,
+                    inactiveThumbColor: cs.onSurfaceVariant,
+                    inactiveTrackColor: cs.surfaceContainerHighest,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -161,17 +162,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Switch(
                     value: _highRefresh,
                     onChanged: (v) => setState(() => _highRefresh = v),
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppColors.accent,
-                    inactiveThumbColor: const Color(0xFF7A7890),
-                    inactiveTrackColor: AppColors.surfaceVariant,
+                    activeThumbColor: cs.surface,
+                    activeTrackColor: AppColorsShared.accent,
+                    inactiveThumbColor: cs.onSurfaceVariant,
+                    inactiveTrackColor: cs.surfaceContainerHighest,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ),
               _SettingsRow(
                 label: 'Battery Optimization',
-                trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF7A7890)),
+                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () {},
                 showDivider: false,
               ),
@@ -182,20 +183,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const _SectionTitle(title: 'PERMISSIONS'),
           _SettingsCard(
             children: [
-              const _SettingsRow(
+              _SettingsRow(
                 label: 'Spatial Camera',
                 trailing: Text(
                   'Allowed',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
-                    color: Color(0xFF7A7890),
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ),
               _SettingsRow(
                 label: 'Motion Sensors',
-                trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF7A7890)),
+                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () {},
                 showDivider: false,
               ),
@@ -214,16 +215,18 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'Space Mono',
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.0,
-          color: Color(0xFF7A7890),
+          color: cs.onSurfaceVariant,
         ),
       ),
     );
@@ -236,12 +239,14 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: cs.outline),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -266,6 +271,8 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     Widget content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -273,11 +280,11 @@ class _SettingsRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: Colors.white,
+              color: cs.onSurface,
             ),
           ),
           trailing,

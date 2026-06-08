@@ -79,8 +79,9 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -97,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen>
                   values: [
                     ValueDelegate.color(
                       const ['**'],
-                      value: AppColors.accent,
+                      value: AppColorsShared.accent,
                     ),
                   ],
                 ),
@@ -109,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen>
                 height: 48,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.accent,
+                  color: AppColorsShared.accent,
                 ),
               ),
 
@@ -127,13 +128,13 @@ class _SplashScreenState extends State<SplashScreen>
                     children: [
                       Text(
                         'Spartial Touch',
-                        style: AppTextTheme.textTheme.headlineMedium!
+                        style: tt.headlineMedium!
                             .copyWith(letterSpacing: -0.5),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         'Feel the space.',
-                        style: AppTextTheme.textTheme.bodyMedium,
+                        style: tt.bodyMedium,
                       ),
                     ],
                   ),

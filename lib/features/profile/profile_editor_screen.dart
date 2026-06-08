@@ -6,8 +6,9 @@ class ProfileEditorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'SpatialTouch',
@@ -28,23 +29,23 @@ class ProfileEditorScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         children: [
           // ── ACTIVE APPLICATION ───────────────────────────────────────────
-          const Text(
+          Text(
             'ACTIVE APPLICATION',
             style: TextStyle(
               fontFamily: 'Space Mono',
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.0,
-              color: Color(0xFF7A7890),
+              color: cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.outline),
+              border: Border.all(color: cs.outline),
             ),
             child: Row(
               children: [
@@ -59,19 +60,19 @@ class ProfileEditorScreen extends StatelessWidget {
                       color: Colors.white, size: 18),
                 ),
                 const SizedBox(width: 16),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Spotify',
                     style: TextStyle(
                       fontFamily: 'Inter',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: cs.onSurface,
                     ),
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF7A7890)),
+                Icon(Icons.keyboard_arrow_down_rounded,
+                    color: cs.onSurfaceVariant),
               ],
             ),
           ),
@@ -79,14 +80,14 @@ class ProfileEditorScreen extends StatelessWidget {
           const SizedBox(height: 32),
 
           // ── GESTURE CONFIGURATION ────────────────────────────────────────
-          const Text(
+          Text(
             'GESTURE CONFIGURATION',
             style: TextStyle(
               fontFamily: 'Space Mono',
               fontSize: 11,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.0,
-              color: Color(0xFF7A7890),
+              color: cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
@@ -124,7 +125,7 @@ class ProfileEditorScreen extends StatelessWidget {
             child: ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent, // Match design's dark button -> map to our accent
+                backgroundColor: AppColorsShared.accent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -159,6 +160,8 @@ class _GestureRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
@@ -170,20 +173,20 @@ class _GestureRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12,
-                    color: Color(0xFF7A7890),
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -192,25 +195,25 @@ class _GestureRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.surfaceVariant, // Muted button background
+              color: cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.outline),
+              border: Border.all(color: cs.outline),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   action,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.unfold_more_rounded,
-                    size: 16, color: Color(0xFF7A7890)),
+                Icon(Icons.unfold_more_rounded,
+                    size: 16, color: cs.onSurfaceVariant),
               ],
             ),
           ),

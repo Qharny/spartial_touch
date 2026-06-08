@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/theme.dart';
 import '../home/home_screen.dart';
 import '../profile/profile_screen.dart';
 import '../gestures/gesture_library_screen.dart';
@@ -25,7 +24,6 @@ class _ShellScreenState extends State<ShellScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _selectedIndex,
         children: _tabs,
@@ -49,11 +47,13 @@ class _CustomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.background,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
-          top: BorderSide(color: AppColors.outline, width: 1),
+          top: BorderSide(color: cs.outline, width: 1),
         ),
       ),
       child: SafeArea(
@@ -104,6 +104,8 @@ class _NavBarIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -114,7 +116,7 @@ class _NavBarIcon extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: isSelected ? Colors.white : const Color(0xFF7A7890),
+              color: isSelected ? cs.onSurface : cs.onSurfaceVariant,
               size: 26,
             ),
             const SizedBox(height: 6),
@@ -124,8 +126,8 @@ class _NavBarIcon extends StatelessWidget {
               child: Container(
                 width: 4,
                 height: 4,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
+                decoration: BoxDecoration(
+                  color: cs.onSurface,
                   shape: BoxShape.circle,
                 ),
               ),

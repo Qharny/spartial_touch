@@ -13,12 +13,12 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Transparent status bar with light icons on dark background.
+  // Light-mode defaults: dark icons on transparent status bar.
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: AppColors.background,
-    systemNavigationBarIconBrightness: Brightness.light,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.white,
+    systemNavigationBarIconBrightness: Brightness.dark,
   ));
 
   runApp(const SpartialTouchApp());
@@ -34,21 +34,26 @@ class SpartialTouchApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
 
       // ── Theme ──────────────────────────────────────────────────────────
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.system, // follows system; defaults to light
 
       // ── Routing ────────────────────────────────────────────────────────
       initialRoute: AppRoutes.splash,
       onGenerateRoute: AppRouter.onGenerateRoute,
 
-      // ── Builder: enforce dark status bar & edge-to-edge ───────────────
+      // ── Builder: adapt system UI to current brightness ─────────────────
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: const SystemUiOverlayStyle(
+          value: SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            systemNavigationBarColor: AppColors.background,
+            statusBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
+            systemNavigationBarColor:
+                Theme.of(context).scaffoldBackgroundColor,
+            systemNavigationBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
           ),
           child: child!,
         );

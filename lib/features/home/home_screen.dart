@@ -43,24 +43,25 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'SpatialTouch',
           style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w800,
             fontSize: 22,
             letterSpacing: -0.5,
-            color: Colors.white,
+            color: cs.onSurface,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Colors.white),
+            icon: Icon(Icons.menu_rounded, color: cs.onSurface),
             onPressed: () {},
           ),
           const SizedBox(width: 8),
@@ -86,18 +87,18 @@ class _HomeScreenState extends State<HomeScreen>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _isActive
-                          ? AppColors.accent.withValues(alpha: 0.1)
+                          ? AppColorsShared.accent.withValues(alpha: 0.1)
                           : Colors.transparent,
                       border: Border.all(
                         color: _isActive
-                            ? AppColors.accent
-                            : const Color(0xFF2A2A3A),
+                            ? AppColorsShared.accent
+                            : cs.outline,
                         width: _isActive ? 2 : 1,
                       ),
                       boxShadow: _isActive
                           ? [
                               BoxShadow(
-                                color: AppColors.accent.withValues(alpha: 0.15),
+                                color: AppColorsShared.accent.withValues(alpha: 0.15),
                                 blurRadius: glow,
                                 spreadRadius: glow / 2,
                               )
@@ -111,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen>
                           Icons.gesture_rounded,
                           key: ValueKey(_isActive),
                           size: 72,
-                          color: _isActive ? AppColors.accent : Colors.white,
+                          color: _isActive ? AppColorsShared.accent : cs.onSurface,
                         ),
                       ),
                     ),
@@ -130,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen>
                 fontSize: 12,
                 letterSpacing: 1.5,
                 fontWeight: FontWeight.w700,
-                color: _isActive ? AppColors.accent : const Color(0xFF666666),
+                color: _isActive ? AppColorsShared.accent : cs.onSurfaceVariant,
               ),
               child: Text(_isActive ? 'SERVICE RUNNING' : 'SERVICE STANDBY'),
             ),
@@ -173,27 +174,27 @@ class _HomeScreenState extends State<HomeScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFF13131C), // code-bg
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF2A2A3A)),
+                border: Border.all(color: cs.outline),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Quick Test',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: cs.onSurface,
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Syne',
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Open the mini gesture tester to check your camera view and lighting.',
                     style: TextStyle(
-                      color: Color(0xFF7A7890), // muted
+                      color: cs.onSurfaceVariant,
                       fontSize: 13,
                       height: 1.5,
                     ),
@@ -205,11 +206,12 @@ class _HomeScreenState extends State<HomeScreen>
                     child: ElevatedButton.icon(
                       onPressed: () {},
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2A2A3A),
-                        foregroundColor: Colors.white,
+                        backgroundColor: cs.surfaceContainerHighest,
+                        foregroundColor: cs.onSurface,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(color: cs.outline),
                         ),
                       ),
                       icon: const Icon(Icons.videocam_outlined, size: 20),
@@ -281,10 +283,12 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 18),
       decoration: BoxDecoration(
-        color: const Color(0xFF16161F), // bg3
+        color: cs.surface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -292,11 +296,11 @@ class _StatTile extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
-              color: Color(0xFF7A7890),
+              color: cs.onSurfaceVariant,
               fontFamily: 'Space Mono',
             ),
           ),
@@ -306,7 +310,7 @@ class _StatTile extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: isActive ? const Color(0xFF03DAC6) : Colors.white,
+              color: isActive ? const Color(0xFF03DAC6) : cs.onSurface,
               fontFamily: 'Inter',
             ),
             child: Text(value),
@@ -330,23 +334,25 @@ class _QuickAccessCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFF111118), // bg2
+          color: cs.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF2A2A3A), width: 1),
+          border: Border.all(color: cs.outline, width: 1),
         ),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.accent, size: 24),
+            Icon(icon, color: AppColorsShared.accent, size: 24),
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: cs.onSurface,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Inter',

@@ -7,8 +7,9 @@ class NotificationsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Notifications'),
         leading: IconButton(
@@ -25,9 +26,9 @@ class NotificationsScreen extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.outline),
+              border: Border.all(color: cs.outline),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,13 +37,13 @@ class NotificationsScreen extends StatelessWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: n.read ? AppColors.surfaceVariant : AppColors.accentMuted,
+                    color: n.read ? cs.surfaceContainerHighest : AppColorsShared.accentMuted,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     n.icon,
                     size: 18,
-                    color: n.read ? AppColors.textDisabled : AppColors.accent,
+                    color: n.read ? cs.onSurfaceVariant : AppColorsShared.accent,
                   ),
                 ),
                 const SizedBox(width: 12),

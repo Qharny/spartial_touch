@@ -7,8 +7,10 @@ class ItemDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Detail'),
         leading: IconButton(
@@ -24,15 +26,17 @@ class ItemDetailScreen extends StatelessWidget {
             Container(
               height: 220,
               decoration: BoxDecoration(
-                gradient: AppColors.cardGradient,
+                gradient: isDark
+                    ? AppColorsDark.cardGradient
+                    : AppColorsLight.cardGradient,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.outline),
+                border: Border.all(color: cs.outline),
               ),
               child: const Center(
                 child: Icon(
                   Icons.spatial_audio_off_rounded,
                   size: 64,
-                  color: AppColors.accent,
+                  color: AppColorsShared.accent,
                 ),
               ),
             ),

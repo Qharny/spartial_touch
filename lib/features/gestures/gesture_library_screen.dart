@@ -8,7 +8,6 @@ class GestureLibraryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'Gestures',
@@ -104,15 +103,17 @@ class _GestureCardState extends State<_GestureCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: () => Navigator.of(context).pushNamed(AppRoutes.gestureDetail),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: _enabled ? AppColors.surface : Colors.transparent,
+          color: _enabled ? cs.surface : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _enabled ? AppColors.accent : AppColors.outline,
+            color: _enabled ? AppColorsShared.accent : cs.outline,
             width: _enabled ? 1.5 : 1.0,
           ),
         ),
@@ -128,10 +129,10 @@ class _GestureCardState extends State<_GestureCard> {
                   child: Switch(
                     value: _enabled,
                     onChanged: (v) => setState(() => _enabled = v),
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: AppColors.accent,
-                    inactiveThumbColor: const Color(0xFF7A7890),
-                    inactiveTrackColor: AppColors.surfaceVariant,
+                    activeThumbColor: cs.surface,
+                    activeTrackColor: AppColorsShared.accent,
+                    inactiveThumbColor: cs.onSurfaceVariant,
+                    inactiveTrackColor: cs.surfaceContainerHighest,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -141,7 +142,7 @@ class _GestureCardState extends State<_GestureCard> {
             Icon(
               widget.icon,
               size: 40,
-              color: _enabled ? const Color(0xFF03DAC6) : const Color(0xFF7A7890),
+              color: _enabled ? const Color(0xFF03DAC6) : cs.onSurfaceVariant,
             ),
             const SizedBox(height: 16),
             Text(
@@ -151,7 +152,7 @@ class _GestureCardState extends State<_GestureCard> {
                 fontFamily: 'Inter',
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: _enabled ? Colors.white : const Color(0xFF7A7890),
+                color: _enabled ? cs.onSurface : cs.onSurfaceVariant,
               ),
             ),
             const Spacer(),

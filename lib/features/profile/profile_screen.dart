@@ -7,8 +7,9 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
           'Profiles',
@@ -59,8 +60,8 @@ class ProfileScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.of(context).pushNamed(AppRoutes.profileEditor),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: cs.onSurface,
+        foregroundColor: Theme.of(context).scaffoldBackgroundColor,
         child: const Icon(Icons.add_rounded, size: 28),
       ),
     );
@@ -97,6 +98,8 @@ class _ProfileCardState extends State<_ProfileCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Dismissible(
       key: ValueKey(widget.title),
       direction: widget.isDefault
@@ -106,19 +109,19 @@ class _ProfileCardState extends State<_ProfileCard> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
         decoration: BoxDecoration(
-          color: AppColors.error.withValues(alpha: 0.2),
+          color: AppColorsShared.error.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+        child: const Icon(Icons.delete_outline_rounded, color: AppColorsShared.error),
       ),
       child: GestureDetector(
         onTap: () => Navigator.of(context).pushNamed(AppRoutes.profileEditor),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface, // Dark theme surface
+            color: cs.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.outline),
+            border: Border.all(color: cs.outline),
           ),
           child: Row(
             children: [
@@ -126,10 +129,10 @@ class _ProfileCardState extends State<_ProfileCard> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
+                  color: cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(widget.icon, color: Colors.white),
+                child: Icon(widget.icon, color: cs.onSurface),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -138,20 +141,20 @@ class _ProfileCardState extends State<_ProfileCard> {
                   children: [
                     Text(
                       widget.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Inter',
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
-                        color: Colors.white,
+                        color: cs.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 13,
-                        color: Color(0xFF7A7890),
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -166,16 +169,16 @@ class _ProfileCardState extends State<_ProfileCard> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cs.onSurface,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text(
+                      child: Text(
                         'DEFAULT',
                         style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
-                          color: Colors.black,
+                          color: Theme.of(context).scaffoldBackgroundColor,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -187,10 +190,10 @@ class _ProfileCardState extends State<_ProfileCard> {
                     child: Switch(
                       value: _enabled,
                       onChanged: (v) => setState(() => _enabled = v),
-                      activeThumbColor: Colors.white,
-                      activeTrackColor: AppColors.accent,
-                      inactiveThumbColor: const Color(0xFF7A7890),
-                      inactiveTrackColor: AppColors.surfaceVariant,
+                      activeThumbColor: cs.surface,
+                      activeTrackColor: AppColorsShared.accent,
+                      inactiveThumbColor: cs.onSurfaceVariant,
+                      inactiveTrackColor: cs.surfaceContainerHighest,
                     ),
                   ),
                 ],
