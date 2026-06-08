@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -6,140 +7,198 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text(
+          'Profiles',
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w700,
+            fontSize: 22,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Avatar
-          Center(
-            child: Column(
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.accentGradient,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.person_rounded,
-                      color: Colors.white, size: 44),
-                ),
-                const SizedBox(height: 16),
-                Text('Your Name', style: tt.headlineSmall),
-                const SizedBox(height: 4),
-                Text('user@spartialtouch.io', style: tt.bodyMedium),
-              ],
-            ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        children: const [
+          _ProfileCard(
+            title: 'Standard Experience',
+            subtitle: 'com.spatialtouch.core',
+            icon: Icons.gesture_rounded,
+            isDefault: true,
+            isEnabled: true,
           ),
-
-          const SizedBox(height: 32),
-
-          // Stats row
-          Row(
-            children: [
-              _Stat(label: 'Sessions', value: '48'),
-              _Stat(label: 'Devices', value: '3'),
-              _Stat(label: 'Hours', value: '120'),
-            ],
+          SizedBox(height: 12),
+          _ProfileCard(
+            title: 'Productivity Mode',
+            subtitle: 'com.spatialtouch.office',
+            icon: Icons.work_outline_rounded,
+            isDefault: false,
+            isEnabled: false,
           ),
-
-          const SizedBox(height: 32),
-
-          // Tiles
-          Text('Account', style: tt.titleMedium),
-          const SizedBox(height: 8),
-          _Tile(
-              icon: Icons.edit_outlined,
-              label: 'Edit Profile',
-              onTap: () {}),
-          _Tile(
-              icon: Icons.lock_outline_rounded,
-              label: 'Privacy',
-              onTap: () {}),
-          _Tile(
-              icon: Icons.help_outline_rounded,
-              label: 'Help & Support',
-              onTap: () {}),
-
-          const SizedBox(height: 24),
-          Text('Preferences', style: tt.titleMedium),
-          const SizedBox(height: 8),
-          _Tile(
-              icon: Icons.notifications_none_rounded,
-              label: 'Notifications',
-              onTap: () {}),
-          _Tile(
-              icon: Icons.language_rounded,
-              label: 'Language',
-              onTap: () {}),
+          SizedBox(height: 12),
+          _ProfileCard(
+            title: 'Immersive Play',
+            subtitle: 'com.spatialtouch.gaming',
+            icon: Icons.gamepad_outlined,
+            isDefault: false,
+            isEnabled: false,
+          ),
+          SizedBox(height: 12),
+          _ProfileCard(
+            title: 'Creative Canvas',
+            subtitle: 'com.spatialtouch.design',
+            icon: Icons.palette_outlined,
+            isDefault: false,
+            isEnabled: false,
+          ),
         ],
       ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-  final String label, value;
-
-  @override
-  Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.outline),
-        ),
-        child: Column(
-          children: [
-            Text(value,
-                style: tt.titleLarge!.copyWith(color: AppColors.accent)),
-            const SizedBox(height: 4),
-            Text(label, style: tt.labelSmall),
-          ],
-        ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.of(context).pushNamed(AppRoutes.profileEditor),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        child: const Icon(Icons.add_rounded, size: 28),
       ),
     );
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile(
-      {required this.icon, required this.label, required this.onTap});
+class _ProfileCard extends StatefulWidget {
+  const _ProfileCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.isDefault = false,
+    this.isEnabled = false,
+  });
+
+  final String title;
+  final String subtitle;
   final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+  final bool isDefault;
+  final bool isEnabled;
+
+  @override
+  State<_ProfileCard> createState() => _ProfileCardState();
+}
+
+class _ProfileCardState extends State<_ProfileCard> {
+  late bool _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _enabled = widget.isEnabled;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 36,
-        height: 36,
+    return Dismissible(
+      key: ValueKey(widget.title),
+      direction: widget.isDefault
+          ? DismissDirection.none
+          : DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
         decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(10),
+          color: AppColors.error.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(16),
         ),
-        child: Icon(icon, size: 18, color: AppColors.textSecondary),
+        child: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
       ),
-      title: Text(label, style: Theme.of(context).textTheme.bodyLarge),
-      trailing: const Icon(Icons.chevron_right_rounded,
-          size: 18, color: AppColors.textDisabled),
-      onTap: onTap,
+      child: GestureDetector(
+        onTap: () => Navigator.of(context).pushNamed(AppRoutes.profileEditor),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface, // Dark theme surface
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(widget.icon, color: Colors.white),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.subtitle,
+                      style: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        color: Color(0xFF7A7890),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (widget.isDefault)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'DEFAULT',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 22),
+                  SizedBox(
+                    height: 24,
+                    child: Switch(
+                      value: _enabled,
+                      onChanged: (v) => setState(() => _enabled = v),
+                      activeThumbColor: Colors.white,
+                      activeTrackColor: AppColors.accent,
+                      inactiveThumbColor: const Color(0xFF7A7890),
+                      inactiveTrackColor: AppColors.surfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

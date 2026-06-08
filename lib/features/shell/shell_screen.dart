@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 import '../home/home_screen.dart';
-import '../search/search_screen.dart';
 import '../profile/profile_screen.dart';
+import '../gestures/gesture_library_screen.dart';
+import '../settings/settings_screen.dart';
 
-/// Persistent shell with animated bottom NavigationBar.
-///
-/// The [NavigationBar] handles tab switching via [IndexedStack] so that each
-/// tab preserves its own navigator state and scroll position.
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
 
@@ -21,26 +17,9 @@ class _ShellScreenState extends State<ShellScreen> {
 
   static const _tabs = [
     HomeScreen(),
-    SearchScreen(),
     ProfileScreen(),
-  ];
-
-  static const _navItems = [
-    NavigationDestination(
-      icon: Icon(Icons.home_outlined),
-      selectedIcon: Icon(Icons.home_rounded),
-      label: 'Home',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.search_outlined),
-      selectedIcon: Icon(Icons.search_rounded),
-      label: 'Search',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.person_outline_rounded),
-      selectedIcon: Icon(Icons.person_rounded),
-      label: 'Profile',
-    ),
+    GestureLibraryScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -51,40 +30,29 @@ class _ShellScreenState extends State<ShellScreen> {
         index: _selectedIndex,
         children: _tabs,
       ),
-      bottomNavigationBar: _AnimatedNavBar(
+      bottomNavigationBar: _CustomNavBar(
         selectedIndex: _selectedIndex,
-        destinations: _navItems,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        onSettingsTap: () =>
-            Navigator.of(context).pushNamed(AppRoutes.settings),
+        onItemSelected: (i) => setState(() => _selectedIndex = i),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Animated Navigation Bar
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _AnimatedNavBar extends StatelessWidget {
-  const _AnimatedNavBar({
+class _CustomNavBar extends StatelessWidget {
+  const _CustomNavBar({
     required this.selectedIndex,
-    required this.destinations,
-    required this.onDestinationSelected,
-    required this.onSettingsTap,
+    required this.onItemSelected,
   });
 
   final int selectedIndex;
-  final List<NavigationDestination> destinations;
-  final ValueChanged<int> onDestinationSelected;
-  final VoidCallback onSettingsTap;
+  final ValueChanged<int> onItemSelected;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: const Border(
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        border: Border(
           top: BorderSide(color: AppColors.outline, width: 1),
         ),
       ),
@@ -93,26 +61,27 @@ class _AnimatedNavBar extends StatelessWidget {
         child: SizedBox(
           height: 64,
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Tabs
-              Expanded(
-                child: Row(
-                  children: List.generate(destinations.length, (i) {
-                    final selected = i == selectedIndex;
-                    return Expanded(
-                      child: _NavItem(
-                        destination: destinations[i],
-                        selected: selected,
-                        onTap: () => onDestinationSelected(i),
-                      ),
-                    );
-                  }),
-                ),
+              _NavBarIcon(
+                icon: Icons.home_outlined,
+                isSelected: selectedIndex == 0,
+                onTap: () => onItemSelected(0),
               ),
-              // Settings button (right side)
-              _NavIconButton(
+              _NavBarIcon(
+                icon: Icons.manage_accounts_outlined,
+                isSelected: selectedIndex == 1,
+                onTap: () => onItemSelected(1),
+              ),
+              _NavBarIcon(
+                icon: Icons.gesture_rounded, // squiggle
+                isSelected: selectedIndex == 2,
+                onTap: () => onItemSelected(2),
+              ),
+              _NavBarIcon(
                 icon: Icons.settings_outlined,
-                onTap: onSettingsTap,
+                isSelected: selectedIndex == 3,
+                onTap: () => onItemSelected(3),
               ),
             ],
           ),
@@ -122,111 +91,47 @@ class _AnimatedNavBar extends StatelessWidget {
   }
 }
 
-class _NavItem extends StatefulWidget {
-  const _NavItem({
-    required this.destination,
-    required this.selected,
+class _NavBarIcon extends StatelessWidget {
+  const _NavBarIcon({
+    required this.icon,
+    required this.isSelected,
     required this.onTap,
   });
 
-  final NavigationDestination destination;
-  final bool selected;
+  final IconData icon;
+  final bool isSelected;
   final VoidCallback onTap;
 
   @override
-  State<_NavItem> createState() => _NavItemState();
-}
-
-class _NavItemState extends State<_NavItem>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-      value: widget.selected ? 1 : 0,
-    );
-    _scale = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
-    );
-  }
-
-  @override
-  void didUpdateWidget(_NavItem old) {
-    super.didUpdateWidget(old);
-    if (widget.selected != old.selected) {
-      if (widget.selected) {
-        _ctrl.forward();
-      } else {
-        _ctrl.reverse();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final selected = widget.selected;
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: ScaleTransition(
-        scale: _scale,
+      child: SizedBox(
+        width: 64,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (child, anim) => ScaleTransition(
-                scale: anim,
-                child: FadeTransition(opacity: anim, child: child),
-              ),
-              child: KeyedSubtree(
-                key: ValueKey(selected),
-                child: selected
-                    ? widget.destination.selectedIcon!
-                    : widget.destination.icon,
-              ),
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : const Color(0xFF7A7890),
+              size: 26,
             ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
+            const SizedBox(height: 6),
+            AnimatedOpacity(
               duration: const Duration(milliseconds: 200),
-              style: AppTextTheme.textTheme.labelSmall!.copyWith(
-                color: selected ? AppColors.accent : AppColors.textDisabled,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              opacity: isSelected ? 1.0 : 0.0,
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
               ),
-              child: Text(widget.destination.label),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _NavIconButton extends StatelessWidget {
-  const _NavIconButton({required this.icon, required this.onTap});
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: IconButton(
-        icon: Icon(icon, size: 22),
-        color: AppColors.textDisabled,
-        onPressed: onTap,
-        tooltip: 'Settings',
       ),
     );
   }
