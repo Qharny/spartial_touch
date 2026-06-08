@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
 class GestureDetailScreen extends StatefulWidget {
@@ -9,9 +10,7 @@ class GestureDetailScreen extends StatefulWidget {
 }
 
 class _GestureDetailScreenState extends State<GestureDetailScreen> {
-  double _sensitivity = 0.5;
-  double _confidence = 0.8;
-  double _cooldown = 0.5;
+  double _sensitivity = 0.6;
 
   @override
   Widget build(BuildContext context) {
@@ -19,31 +18,32 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text(
-          'Wave Up',
+          'Gesture Detail',
           style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
-            fontSize: 20,
+            fontSize: 16,
+            color: Colors.white,
           ),
         ),
+        centerTitle: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(Icons.close_rounded, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Animated Demo Area ─────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              height: 200,
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        children: [
+          // ── Gesture Large Icon ──────────────────────────────────────────
+          GestureDetector(
+            onTap: () => Navigator.of(context).pushNamed(AppRoutes.gestureTester),
+            child: Container(
+              height: 220,
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: const Color(0xFF111118),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.outline),
               ),
@@ -51,193 +51,324 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.arrow_upward_rounded,
-                        size: 64, color: AppColors.accent),
-                    SizedBox(height: 16),
-                    Text(
-                      'Animation Demo Placeholder',
-                      style: TextStyle(
-                        fontFamily: 'Inter',
-                        color: Color(0xFF7A7890),
-                      ),
-                    ),
+                    Icon(Icons.pan_tool_outlined, size: 64, color: Colors.white),
+                    SizedBox(height: 8),
+                    Icon(Icons.keyboard_double_arrow_up_rounded, size: 32, color: Colors.white),
                   ],
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 24),
 
-            const SizedBox(height: 32),
-
-            // ── Sliders & Inputs ───────────────────────────────────────────
-            const Text(
-              'CONFIGURATION',
-              style: TextStyle(
-                fontFamily: 'Space Mono',
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.0,
-                color: Color(0xFF7A7890),
-              ),
+          // ── Title & Description ─────────────────────────────────────────
+          const Text(
+            'Wave Up',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
             ),
-            const SizedBox(height: 16),
-
-            // Sensitivity
-            _ConfigSlider(
-              label: 'Sensitivity',
-              value: _sensitivity,
-              minLabel: 'Low',
-              maxLabel: 'High',
-              onChanged: (v) => setState(() => _sensitivity = v),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Quick upward motion with an open palm. Hold fingers steady for better detection.',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              color: Color(0xFFB0B0C0),
+              height: 1.4,
             ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 24),
 
-            // Confidence
-            _ConfigSlider(
-              label: 'Confidence Threshold',
-              value: _confidence,
-              minLabel: 'Strict',
-              maxLabel: 'Lenient',
-              onChanged: (v) => setState(() => _confidence = v),
-            ),
-            const SizedBox(height: 24),
-
-            // Cooldown
-            _ConfigSlider(
-              label: 'Cooldown Time',
-              value: _cooldown,
-              minLabel: '0.1s',
-              maxLabel: '2.0s',
-              onChanged: (v) => setState(() => _cooldown = v),
-            ),
-
-            const SizedBox(height: 48),
-
-            // ── Action Buttons ─────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.videocam_outlined),
-                label: const Text('Test Live Detection'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  textStyle: const TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+          // ── Stats ────────────────────────────────────────────────────────
+          const Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  label: 'ACCURACY',
+                  value: '98.4%',
                 ),
               ),
+              SizedBox(width: 16),
+              Expanded(
+                child: _StatCard(
+                  label: 'DAILY USAGE',
+                  value: '142',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+
+          // ── Sensitivity ──────────────────────────────────────────────────
+          const _SectionHeader(title: 'Sensitivity'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.outline),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    _sensitivity = 0.5;
-                    _confidence = 0.8;
-                    _cooldown = 0.5;
-                  });
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.outline),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Low', style: TextStyle(fontSize: 12, color: Color(0xFF7A7890))),
+                    Text('High', style: TextStyle(fontSize: 12, color: Color(0xFF7A7890))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                  ),
+                  child: Slider(
+                    value: _sensitivity,
+                    onChanged: (v) => setState(() => _sensitivity = v),
+                    activeColor: Colors.white,
+                    inactiveColor: const Color(0xFF2A2A3A),
                   ),
                 ),
-                child: const Text(
-                  'Reset to Defaults',
+                const SizedBox(height: 16),
+                const Text(
+                  'Higher sensitivity makes the gesture easier to trigger but may increase accidental activations.',
                   style: TextStyle(
                     fontFamily: 'Inter',
-                    fontSize: 15,
+                    fontSize: 13,
+                    color: Color(0xFFB0B0C0),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // ── Global Action ────────────────────────────────────────────────
+          const _SectionHeader(title: 'Global Action'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.outline),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.keyboard_double_arrow_up_rounded, color: Color(0xFF7A7890), size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Scroll Up',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF7A7890)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // ── App Overrides ────────────────────────────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const _SectionHeader(title: 'App Overrides'),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.outline),
+                ),
+                child: const Text(
+                  'Add App',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const _AppOverrideCard(
+            appName: 'Spotify',
+            action: 'Next Song',
+            icon: Icons.music_note_rounded,
+          ),
+          const SizedBox(height: 12),
+          const _AppOverrideCard(
+            appName: 'Chrome',
+            action: 'Refresh Page',
+            icon: Icons.language_rounded,
+          ),
+
+          const SizedBox(height: 48),
+
+          // ── Bottom Dots (Mocked Pager Indicator) ──────────────────────────
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFF7A7890))),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 16, height: 4,
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFF7A7890))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
 }
 
-class _ConfigSlider extends StatelessWidget {
-  const _ConfigSlider({
-    required this.label,
-    required this.value,
-    required this.minLabel,
-    required this.maxLabel,
-    required this.onChanged,
-  });
-
+class _StatCard extends StatelessWidget {
+  const _StatCard({required this.label, required this.value});
   final String label;
-  final double value;
-  final String minLabel;
-  final String maxLabel;
-  final ValueChanged<double> onChanged;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Space Mono',
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
+              color: Color(0xFF7A7890),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 4,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
           ),
-          child: Slider(
-            value: value,
-            onChanged: onChanged,
-            activeColor: AppColors.accent,
-            inactiveColor: AppColors.surfaceVariant,
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
+    );
+  }
+}
+
+class _AppOverrideCard extends StatelessWidget {
+  const _AppOverrideCard({
+    required this.appName,
+    required this.action,
+    required this.icon,
+  });
+
+  final String appName;
+  final String action;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFF111118),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: Colors.white),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                minLabel,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  color: Color(0xFF7A7890),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appName,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              Text(
-                maxLabel,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 12,
-                  color: Color(0xFF7A7890),
+                const SizedBox(height: 2),
+                Text(
+                  action,
+                  style: const TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    color: Color(0xFF7A7890),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+          const Icon(Icons.chevron_right_rounded, color: Color(0xFF7A7890)),
+        ],
+      ),
     );
   }
 }

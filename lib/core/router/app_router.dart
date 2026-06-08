@@ -9,6 +9,7 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/profile/profile_editor_screen.dart';
 import '../../features/gestures/gesture_library_screen.dart';
 import '../../features/gestures/gesture_detail_screen.dart';
+import '../../features/gestures/gesture_tester_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/shell_screen.dart';
 import '../../features/splash/splash_screen.dart';
@@ -33,6 +34,7 @@ abstract final class AppRouter {
       AppRoutes.profileEditor => _slide(const ProfileEditorScreen(), settings),
       AppRoutes.gestureLibrary => _fadeSlide(const GestureLibraryScreen(), settings),
       AppRoutes.gestureDetail => _slide(const GestureDetailScreen(), settings),
+      AppRoutes.gestureTester => _fade(const GestureTesterScreen(), settings),
       AppRoutes.settings => _slide(const SettingsScreen(), settings),
       AppRoutes.notifications => _slide(const NotificationsScreen(), settings),
       AppRoutes.itemDetail => _slide(const ItemDetailScreen(), settings),
