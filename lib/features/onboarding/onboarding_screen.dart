@@ -35,38 +35,47 @@ final List<_Page> _pages = [
   const _Page(
     style: _PageStyle.light,
     illustration: _WelcomeIllustration(),
-    title: 'Control with a Wave',
+    title: 'Control your phone with air',
     body:
-        'SpartialTouch lets you control your phone without touching the screen using advanced air gestures.',
+        'Control any Android app with mid-air hand gestures. Wave your hand to scroll, tap, and swipe, no screen contact required.',
     primaryLabel: 'Get Started',
-    secondaryLabel: 'Skip tour',
+    secondaryLabel: 'Skip for returning users',
   ),
   const _Page(
     style: _PageStyle.light,
     illustration: _CameraIllustration(),
-    title: 'Spatial Camera',
+    title: 'Camera Permission',
     body:
-        'We use the front camera to track hand movements. All processing happens on-device; no data ever leaves your phone.',
-    primaryLabel: 'Allow Camera Access',
-    secondaryLabel: 'Learn more about privacy',
+        'Used ONLY on-device to detect hand gestures. Never recorded or transmitted.',
+    primaryLabel: 'Grant Camera Access',
+    secondaryLabel: 'How to enable manually',
+  ),
+  const _Page(
+    style: _PageStyle.dark,
+    illustration: _AccessibilityIllustration(),
+    title: 'Accessibility Service',
+    body:
+        'We need Accessibility Service enabled to inject scroll and tap events into your apps.',
+    primaryLabel: 'Open Accessibility Settings',
+    secondaryLabel: 'I have already enabled it',
   ),
   const _Page(
     style: _PageStyle.dark,
     illustration: _OverlayIllustration(),
-    title: 'System Overlay',
+    title: 'Overlay Permission',
     body:
-        'Enable the overlay to see visual feedback when a gesture is recognized and keep the service active over other apps.',
+        'The floating indicator bubble lets you know when gestures are detected. Optional but recommended.',
     primaryLabel: 'Enable Overlay',
-    secondaryLabel: 'Maybe later',
+    secondaryLabel: 'Skip for now',
   ),
   const _Page(
     style: _PageStyle.light,
     illustration: _CalibrationIllustration(),
-    title: 'Perfect Calibration',
+    title: 'Calibration',
     body:
-        "Find a well-lit spot and place your phone about 1–2 feet away. We'll run a quick check to ensure gestures work perfectly.",
-    primaryLabel: 'Start Calibration',
-    secondaryLabel: "I'll do it later",
+        'Let\'s tailor the detection to your environment. Hold your hand at a natural distance so we can measure lighting and distance thresholds.',
+    primaryLabel: 'Calibration Complete',
+    secondaryLabel: 'Skip',
   ),
 ];
 
@@ -497,31 +506,108 @@ class _WelcomeIllustration extends StatelessWidget {
   }
 }
 
-/// Screen 2 — camera icon in a rounded card with subtle shadow
+/// Screen 2 — camera icon in a rounded card with a privacy shield
 class _CameraIllustration extends StatelessWidget {
   const _CameraIllustration();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFE4E4E4), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
-            blurRadius: 24,
-            offset: const Offset(0, 6),
+    return SizedBox(
+      width: 140,
+      height: 140,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: const Color(0xFFE4E4E4), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.07),
+                  blurRadius: 24,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.photo_camera_outlined,
+              size: 54,
+              color: Color(0xFF0A0A0A),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 4,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF03DAC6), // teal shield
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFF7F7F7), width: 4),
+              ),
+              child: const Icon(
+                Icons.shield_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
           ),
         ],
       ),
-      child: const Icon(
-        Icons.photo_camera_outlined,
-        size: 54,
-        color: Color(0xFF0A0A0A),
+    );
+  }
+}
+
+/// Screen 3 — Accessibility Service visual guide
+class _AccessibilityIllustration extends StatelessWidget {
+  const _AccessibilityIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 140,
+      height: 140,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: const Color(0xFF222222),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF333333), width: 1.5),
+            ),
+            child: const Icon(
+              Icons.settings_accessibility_rounded,
+              color: Color(0xFFAAAAAA),
+              size: 54,
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 4,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accent, // purple badge
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.background, width: 4),
+              ),
+              child: const Icon(
+                Icons.touch_app_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

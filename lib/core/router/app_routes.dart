@@ -12,6 +12,9 @@ abstract final class AppRoutes {
 
   // ── Detail / Sub-pages ───────────────────────────────────────────────────
   static const String itemDetail = '/item-detail';
+  static const String profileEditor = '/profile-editor';
+  static const String gestureLibrary = '/gesture-library';
+  static const String gestureDetail = '/gesture-detail';
   static const String settings = '/settings';
   static const String notifications = '/notifications';
 }
