@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">SpatialTouch requires this service to perform gestures (such as swiping and tapping) on your behalf, without requiring you to touch the screen.</string>
+</resources>
