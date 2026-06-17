@@ -42,16 +42,17 @@ class _SplashScreenState extends State<SplashScreen>
     // ── Fixed 3-second splash ───────────────────────────────────────────────
     // Navigation always fires at the 3s mark, regardless of Lottie load time.
     // Fork: first launch → onboarding; returning users → Dashboard.
-    Future<void>.delayed(
-      const Duration(seconds: 3),
-      () {
-        if (!mounted) return;
-        final next = AppSession.instance.onboardingComplete
-            ? AppRoutes.shell
-            : AppRoutes.onboarding;
-        Navigator.of(context).pushReplacementNamed(next);
-      },
-    );
+    // Persisted onboarding flag is hydrated in parallel during the delay.
+    Future.wait<void>([
+      AppSession.instance.load(),
+      Future<void>.delayed(const Duration(seconds: 3)),
+    ]).then((_) {
+      if (!mounted) return;
+      final next = AppSession.instance.onboardingComplete
+          ? AppRoutes.shell
+          : AppRoutes.onboarding;
+      Navigator.of(context).pushReplacementNamed(next);
+    });
 
     // Text slides up at 1.5 s so it fills the second half of the splash.
     Future<void>.delayed(

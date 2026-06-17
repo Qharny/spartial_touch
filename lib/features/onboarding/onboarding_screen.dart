@@ -1,5 +1,7 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/app_session.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
@@ -10,8 +12,12 @@ import '../../core/theme/theme.dart';
 
 enum _PageStyle { light, dark }
 
+/// Identifies the behaviour behind each onboarding page's primary action.
+enum OnboardingStep { welcome, camera, accessibility, overlay, calibration, profile }
+
 class _Page {
   const _Page({
+    required this.step,
     required this.style,
     required this.illustration,
     required this.title,
@@ -20,6 +26,7 @@ class _Page {
     required this.secondaryLabel,
   });
 
+  final OnboardingStep step;
   final _PageStyle style;
   final Widget illustration;
   final String title;
@@ -34,6 +41,7 @@ class _Page {
 
 final List<_Page> _pages = [
   const _Page(
+    step: OnboardingStep.welcome,
     style: _PageStyle.light,
     illustration: _WelcomeIllustration(),
     title: 'Control your phone with air',
@@ -43,6 +51,7 @@ final List<_Page> _pages = [
     secondaryLabel: 'Skip for returning users',
   ),
   const _Page(
+    step: OnboardingStep.camera,
     style: _PageStyle.light,
     illustration: _CameraIllustration(),
     title: 'Camera Permission',
@@ -52,6 +61,7 @@ final List<_Page> _pages = [
     secondaryLabel: 'How to enable manually',
   ),
   const _Page(
+    step: OnboardingStep.accessibility,
     style: _PageStyle.dark,
     illustration: _AccessibilityIllustration(),
     title: 'Accessibility Service',
@@ -61,6 +71,7 @@ final List<_Page> _pages = [
     secondaryLabel: 'I have already enabled it',
   ),
   const _Page(
+    step: OnboardingStep.overlay,
     style: _PageStyle.dark,
     illustration: _OverlayIllustration(),
     title: 'Overlay Permission',
@@ -70,6 +81,7 @@ final List<_Page> _pages = [
     secondaryLabel: 'Skip for now',
   ),
   const _Page(
+    step: OnboardingStep.calibration,
     style: _PageStyle.light,
     illustration: _CalibrationIllustration(),
     title: 'Calibration',
@@ -79,6 +91,7 @@ final List<_Page> _pages = [
     secondaryLabel: 'Skip',
   ),
   const _Page(
+    step: OnboardingStep.profile,
     style: _PageStyle.light,
     illustration: _FirstProfileIllustration(),
     title: 'Create your first profile',
@@ -104,12 +117,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _ctrl = PageController();
   int _page = 0;
 
+  /// Steps the user has satisfied (granted, visited, or calibrated).
+  final Set<OnboardingStep> _done = {};
+
+  /// True while an async permission request is in flight (locks the button).
+  bool _busy = false;
+
+  /// True while the calibration sweep is running.
+  bool _calibrating = false;
+
   // ── helpers ────────────────────────────────────────────────────────────────
 
-  bool get _isLight => _pages[_page].style == _PageStyle.light;
+  _Page get _current => _pages[_page];
+  bool get _isLight => _current.style == _PageStyle.light;
 
   Color get _fg => _isLight ? const Color(0xFF0A0A0A) : Colors.white;
   Color get _bg => _isLight ? Colors.white : AppColors.background;
+
+  /// Label shown on the primary button — reflects in-flight / completed state.
+  String get _primaryLabel {
+    if (_calibrating) return 'Calibrating…';
+    final step = _current.step;
+    final done = _done.contains(step);
+    if (done &&
+        step != OnboardingStep.welcome &&
+        step != OnboardingStep.profile) {
+      return 'Continue';
+    }
+    return _current.primaryLabel;
+  }
 
   void _next() {
     if (_page < _pages.length - 1) {
@@ -122,10 +158,119 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  void _finish() {
-    // Mark the funnel done so a later Splash forks straight to the Dashboard.
-    AppSession.instance.onboardingComplete = true;
+  Future<void> _finish() async {
+    // Persist completion so a later Splash forks straight to the Dashboard.
+    await AppSession.instance.setOnboardingComplete(true);
+    if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(AppRoutes.shell);
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // ── Primary action — branches on the current step ──────────────────────────
+
+  Future<void> _onPrimary() async {
+    if (_busy || _calibrating) return;
+    final step = _current.step;
+
+    // Already satisfied → just advance.
+    if (_done.contains(step) &&
+        step != OnboardingStep.welcome &&
+        step != OnboardingStep.profile) {
+      _next();
+      return;
+    }
+
+    switch (step) {
+      case OnboardingStep.welcome:
+        _next();
+      case OnboardingStep.camera:
+        await _requestCamera();
+      case OnboardingStep.accessibility:
+        await _openAccessibilitySettings();
+      case OnboardingStep.overlay:
+        await _requestOverlay();
+      case OnboardingStep.calibration:
+        await _runCalibration();
+      case OnboardingStep.profile:
+        await _finish();
+    }
+  }
+
+  // ── Secondary action — the "skip / manual / already done" link ──────────────
+
+  Future<void> _onSecondary() async {
+    if (_busy || _calibrating) return;
+    switch (_current.step) {
+      case OnboardingStep.welcome:
+        await _finish(); // skip the whole funnel
+      case OnboardingStep.camera:
+        await AppSettings.openAppSettings(); // enable manually
+      case OnboardingStep.accessibility:
+        setState(() => _done.add(OnboardingStep.accessibility));
+        _next(); // "I have already enabled it"
+      case OnboardingStep.overlay:
+        _next(); // skip (optional)
+      case OnboardingStep.calibration:
+        _next(); // skip
+      case OnboardingStep.profile:
+        await _finish(); // skip for now
+    }
+  }
+
+  // ── Step implementations ────────────────────────────────────────────────────
+
+  Future<void> _requestCamera() async {
+    setState(() => _busy = true);
+    final status = await Permission.camera.request();
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    if (status.isGranted) {
+      setState(() => _done.add(OnboardingStep.camera));
+      _next();
+    } else if (status.isPermanentlyDenied) {
+      _snack('Camera access was blocked. Enable it in Settings to continue.');
+      await AppSettings.openAppSettings();
+    } else {
+      _snack('Camera access is required to detect gestures.');
+    }
+  }
+
+  Future<void> _openAccessibilitySettings() async {
+    // We can't reliably detect the service from Dart, so opening the settings
+    // marks the step as "visited" — the button then becomes "Continue".
+    await AppSettings.openAppSettings(type: AppSettingsType.accessibility);
+    if (!mounted) return;
+    setState(() => _done.add(OnboardingStep.accessibility));
+    _snack('Enable SpartialTouch, then return and tap Continue.');
+  }
+
+  Future<void> _requestOverlay() async {
+    setState(() => _busy = true);
+    final status = await Permission.systemAlertWindow.request();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (status.isGranted) _done.add(OnboardingStep.overlay);
+    });
+    _next(); // optional — always advance
+  }
+
+  Future<void> _runCalibration() async {
+    setState(() => _calibrating = true);
+    await Future<void>.delayed(const Duration(milliseconds: 2200));
+    if (!mounted) return;
+    setState(() {
+      _calibrating = false;
+      _done.add(OnboardingStep.calibration);
+    });
+    _next();
   }
 
   void _back() {
@@ -245,11 +390,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
                 // ── Bottom actions ───────────────────────────────────────
                 _BottomActions(
-                  page: _pages[_page],
+                  primaryLabel: _primaryLabel,
+                  secondaryLabel: _current.secondaryLabel,
                   isLight: _isLight,
                   fg: _fg,
-                  onPrimary: _next,
-                  onSecondary: _finish,
+                  busy: _busy || _calibrating,
+                  granted: _done.contains(_current.step) &&
+                      _current.step != OnboardingStep.welcome &&
+                      _current.step != OnboardingStep.profile,
+                  onPrimary: _onPrimary,
+                  onSecondary: _onSecondary,
                 ),
               ],
             ),
@@ -358,16 +508,22 @@ class _PageContent extends StatelessWidget {
 
 class _BottomActions extends StatelessWidget {
   const _BottomActions({
-    required this.page,
+    required this.primaryLabel,
+    required this.secondaryLabel,
     required this.isLight,
     required this.fg,
+    required this.busy,
+    required this.granted,
     required this.onPrimary,
     required this.onSecondary,
   });
 
-  final _Page page;
+  final String primaryLabel;
+  final String secondaryLabel;
   final bool isLight;
   final Color fg;
+  final bool busy;
+  final bool granted;
   final VoidCallback onPrimary, onSecondary;
 
   @override
@@ -380,12 +536,44 @@ class _BottomActions extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Granted status chip
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            child: granted
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          color: Color(0xFF03DAC6),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Permission granted',
+                          style: TextStyle(
+                            color: fg.withValues(alpha: 0.7),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Inter',
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+
           // Primary button
           SizedBox(
             width: double.infinity,
             height: 54,
             child: _PressableButton(
-              label: page.primaryLabel,
+              label: primaryLabel,
+              busy: busy,
               backgroundColor: btnBg,
               foregroundColor: btnFg,
               onTap: onPrimary,
@@ -396,14 +584,14 @@ class _BottomActions extends StatelessWidget {
 
           // Secondary link
           GestureDetector(
-            onTap: onSecondary,
+            onTap: busy ? null : onSecondary,
             behavior: HitTestBehavior.opaque,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Text(
-                page.secondaryLabel,
+                secondaryLabel,
                 style: TextStyle(
-                  color: fg.withValues(alpha: 0.45),
+                  color: fg.withValues(alpha: busy ? 0.2 : 0.45),
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
                   fontFamily: 'Inter',
@@ -418,18 +606,20 @@ class _BottomActions extends StatelessWidget {
   }
 }
 
-// Pressable button with spring-scale feedback
+// Pressable button with spring-scale feedback + busy spinner
 class _PressableButton extends StatefulWidget {
   const _PressableButton({
     required this.label,
     required this.backgroundColor,
     required this.foregroundColor,
     required this.onTap,
+    this.busy = false,
   });
 
   final String label;
   final Color backgroundColor, foregroundColor;
   final VoidCallback onTap;
+  final bool busy;
 
   @override
   State<_PressableButton> createState() => _PressableButtonState();
@@ -462,32 +652,46 @@ class _PressableButtonState extends State<_PressableButton>
 
   @override
   Widget build(BuildContext context) {
+    final disabled = widget.busy;
+
     return GestureDetector(
-      onTapDown: (_) => _ctrl.forward(),
-      onTapUp: (_) {
-        _ctrl.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _ctrl.reverse(),
+      onTapDown: disabled ? null : (_) => _ctrl.forward(),
+      onTapUp: disabled
+          ? null
+          : (_) {
+              _ctrl.reverse();
+              widget.onTap();
+            },
+      onTapCancel: disabled ? null : () => _ctrl.reverse(),
       child: ScaleTransition(
         scale: _scale,
         child: Container(
           decoration: BoxDecoration(
-            color: widget.backgroundColor,
+            color: widget.backgroundColor.withValues(alpha: disabled ? 0.6 : 1),
             borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              color: widget.foregroundColor,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Inter',
-              letterSpacing: -0.2,
-              decoration: TextDecoration.none,
-            ),
-          ),
+          child: widget.busy
+              ? SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(widget.foregroundColor),
+                  ),
+                )
+              : Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: widget.foregroundColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
+                    letterSpacing: -0.2,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
         ),
       ),
     );

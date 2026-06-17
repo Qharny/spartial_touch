@@ -14,6 +14,7 @@ abstract final class AppRoutes {
   static const String itemDetail = '/item-detail';
   static const String profileEditor = '/profile-editor';
   static const String gestureLibrary = '/gesture-library';
+  static const String customGesture = '/custom-gesture';
   static const String gestureDetail = '/gesture-detail';
   static const String gestureTester = '/gesture-tester';
   static const String calibration = '/calibration';
