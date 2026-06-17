@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/app_session.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
@@ -77,6 +78,15 @@ final List<_Page> _pages = [
     primaryLabel: 'Calibration Complete',
     secondaryLabel: 'Skip',
   ),
+  const _Page(
+    style: _PageStyle.light,
+    illustration: _FirstProfileIllustration(),
+    title: 'Create your first profile',
+    body:
+        'Pick an app to control with gestures. You can fine-tune mappings any time from the Profiles tab.',
+    primaryLabel: 'Finish Setup',
+    secondaryLabel: 'Skip for now',
+  ),
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +122,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  void _finish() => Navigator.of(context).pushReplacementNamed(AppRoutes.shell);
+  void _finish() {
+    // Mark the funnel done so a later Splash forks straight to the Dashboard.
+    AppSession.instance.onboardingComplete = true;
+    Navigator.of(context).pushReplacementNamed(AppRoutes.shell);
+  }
 
   void _back() {
     if (_page > 0) {
@@ -738,6 +752,63 @@ class _CalibrationIllustration extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Screen 6 — app tile picker hint: a primary app card with a + badge
+class _FirstProfileIllustration extends StatelessWidget {
+  const _FirstProfileIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 160,
+      height: 160,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 130,
+            height: 130,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: const Color(0xFFE4E4E4), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.07),
+                  blurRadius: 24,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.apps_rounded,
+              size: 58,
+              color: Color(0xFF0A0A0A),
+            ),
+          ),
+          Positioned(
+            bottom: 4,
+            right: 8,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColorsShared.accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFF7F7F7), width: 4),
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

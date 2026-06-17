@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import '../../core/app_session.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
@@ -40,9 +41,16 @@ class _SplashScreenState extends State<SplashScreen>
 
     // ── Fixed 3-second splash ───────────────────────────────────────────────
     // Navigation always fires at the 3s mark, regardless of Lottie load time.
+    // Fork: first launch → onboarding; returning users → Dashboard.
     Future<void>.delayed(
       const Duration(seconds: 3),
-      () { if (mounted) Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding); },
+      () {
+        if (!mounted) return;
+        final next = AppSession.instance.onboardingComplete
+            ? AppRoutes.shell
+            : AppRoutes.onboarding;
+        Navigator.of(context).pushReplacementNamed(next);
+      },
     );
 
     // Text slides up at 1.5 s so it fills the second half of the splash.

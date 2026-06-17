@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onNavigateToTab});
+
+  /// Switches the parent shell to the given tab index
+  /// (0 = Home, 1 = Profiles, 2 = Gestures, 3 = Settings).
+  final void Function(int index)? onNavigateToTab;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -204,7 +209,8 @@ class _HomeScreenState extends State<HomeScreen>
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton.icon(
-                      onPressed: () {},
+                      onPressed: () => Navigator.of(context)
+                          .pushNamed(AppRoutes.gestureTester),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: cs.surfaceContainerHighest,
                         foregroundColor: cs.onSurface,
@@ -238,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: _QuickAccessCard(
                     icon: Icons.app_settings_alt_rounded,
                     title: 'Profiles',
-                    onTap: () {},
+                    onTap: () => widget.onNavigateToTab?.call(1),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -246,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: _QuickAccessCard(
                     icon: Icons.auto_awesome_motion_rounded,
                     title: 'Gestures',
-                    onTap: () {},
+                    onTap: () => widget.onNavigateToTab?.call(2),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -254,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: _QuickAccessCard(
                     icon: Icons.settings_rounded,
                     title: 'Settings',
-                    onTap: () {},
+                    onTap: () => widget.onNavigateToTab?.call(3),
                   ),
                 ),
               ],

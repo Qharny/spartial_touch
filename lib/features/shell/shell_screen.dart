@@ -14,19 +14,21 @@ class ShellScreen extends StatefulWidget {
 class _ShellScreenState extends State<ShellScreen> {
   int _selectedIndex = 0;
 
-  static const _tabs = [
-    HomeScreen(),
-    ProfileScreen(),
-    GestureLibraryScreen(),
-    SettingsScreen(),
-  ];
+  void _selectTab(int i) => setState(() => _selectedIndex = i);
 
   @override
   Widget build(BuildContext context) {
+    final tabs = [
+      HomeScreen(onNavigateToTab: _selectTab),
+      const ProfileScreen(),
+      const GestureLibraryScreen(),
+      const SettingsScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: _tabs,
+        children: tabs,
       ),
       bottomNavigationBar: _CustomNavBar(
         selectedIndex: _selectedIndex,

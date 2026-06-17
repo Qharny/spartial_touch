@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -174,6 +175,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 label: 'Battery Optimization',
                 trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () {},
+                showDivider: false,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          const _SectionTitle(title: 'CALIBRATION'),
+          _SettingsCard(
+            children: [
+              _SettingsRow(
+                label: 'Redo Calibration',
+                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                onTap: () => Navigator.of(context).pushNamed(AppRoutes.calibration),
                 showDivider: false,
               ),
             ],

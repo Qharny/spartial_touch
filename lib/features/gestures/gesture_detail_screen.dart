@@ -81,6 +81,34 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
               height: 1.4,
             ),
           ),
+          const SizedBox(height: 20),
+
+          // ── Live Test button → Gesture tester sandbox ───────────────────
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () =>
+                  Navigator.of(context).pushNamed(AppRoutes.gestureTester),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: cs.onSurface,
+                foregroundColor: Theme.of(context).scaffoldBackgroundColor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.videocam_outlined, size: 20),
+              label: const Text(
+                'Test This Gesture',
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
 
           // ── Stats ────────────────────────────────────────────────────────
