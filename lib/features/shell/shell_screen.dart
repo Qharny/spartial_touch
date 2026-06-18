@@ -20,8 +20,8 @@ class _ShellScreenState extends State<ShellScreen> {
   Widget build(BuildContext context) {
     final tabs = [
       HomeScreen(onNavigateToTab: _selectTab),
-      const ProfileScreen(),
       const GestureLibraryScreen(),
+      const ProfileScreen(),
       const SettingsScreen(),
     ];
 
@@ -71,12 +71,12 @@ class _CustomNavBar extends StatelessWidget {
                 onTap: () => onItemSelected(0),
               ),
               _NavBarIcon(
-                icon: Icons.manage_accounts_outlined,
+                icon: Icons.gesture_rounded, // squiggle
                 isSelected: selectedIndex == 1,
                 onTap: () => onItemSelected(1),
               ),
               _NavBarIcon(
-                icon: Icons.gesture_rounded, // squiggle
+                icon: Icons.manage_accounts_outlined,
                 isSelected: selectedIndex == 2,
                 onTap: () => onItemSelected(2),
               ),
