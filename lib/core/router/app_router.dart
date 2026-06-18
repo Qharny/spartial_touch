@@ -18,6 +18,7 @@ import '../../features/splash/splash_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/item_detail/item_detail_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/profile/privacy_screen.dart';
 
 /// Builds the [MaterialApp.onGenerateRoute] route table.
 ///
@@ -42,6 +43,7 @@ abstract final class AppRouter {
       AppRoutes.settings => _slide(const SettingsScreen(), settings),
       AppRoutes.notifications => _slide(const NotificationsScreen(), settings),
       AppRoutes.itemDetail => _slide(const ItemDetailScreen(), settings),
+      AppRoutes.privacy => _slide(const PrivacyScreen(), settings),
       _ => _notFound(settings),
     };
   }

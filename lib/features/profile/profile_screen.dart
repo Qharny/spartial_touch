@@ -171,6 +171,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.info_outline_rounded,
             onTap: () {},
           ),
+          const SizedBox(height: 12),
+          _SettingsCard(
+            title: 'Permissions & Privacy',
+            subtitle: 'Review required permissions and privacy commitments',
+            icon: Icons.shield_outlined,
+            onTap: () => Navigator.of(context).pushNamed(AppRoutes.privacy),
+          ),
           const SizedBox(height: 32),
         ],
       ),

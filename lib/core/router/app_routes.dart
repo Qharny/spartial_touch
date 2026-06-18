@@ -20,4 +20,5 @@ abstract final class AppRoutes {
   static const String calibration = '/calibration';
   static const String settings = '/settings';
   static const String notifications = '/notifications';
+  static const String privacy = '/privacy';
 }
