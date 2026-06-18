@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'package:flutter/services.dart';
+import 'package:spartial_touch/core/services/gesture_channel.dart';
 
 class GestureRecognitionService {
-  static const EventChannel _gestureChannel =
-      EventChannel('com.example.spartial_touch/gestures');
-
   final StreamController<String> _gestureStreamController =
       StreamController<String>.broadcast();
 
@@ -13,17 +10,17 @@ class GestureRecognitionService {
   Stream<String> get gestureStream => _gestureStreamController.stream;
 
   void startListening() {
+    GestureChannel.startService();
     _platformSubscription ??=
-        _gestureChannel.receiveBroadcastStream().listen((dynamic event) {
-      if (event is String) {
-        _gestureStreamController.add(event);
-      }
-    }, onError: (dynamic error) {
+        GestureChannel.gestureStream.listen((event) {
+      _gestureStreamController.add(event);
+    }, onError: (error) {
       print('Gesture Recognition Error: $error');
     });
   }
 
   void stopListening() {
+    GestureChannel.stopService();
     _platformSubscription?.cancel();
     _platformSubscription = null;
   }

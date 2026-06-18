@@ -1,37 +1,53 @@
 package com.example.spartial_touch
 
+import android.content.Intent
+import android.os.Bundle
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
-import androidx.lifecycle.LifecycleOwner
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.spartial_touch/gestures"
-    private var eventSink: EventChannel.EventSink? = null
-    
-    private lateinit var cameraManager: CameraManager
-    private lateinit var mediaPipeHandLandmarker: MediaPipeHandLandmarker
+    companion object {
+        const val GESTURE_CHANNEL = "com.example.spartial_touch/gestures"
+        const val GESTURE_EVENT_CHANNEL = "com.example.spartial_touch/gesture_events"
+        const val VOLUME_CHANNEL = "com.example.spartial_touch/volume"
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Set up EventChannel for Gestures
-        EventChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setStreamHandler(
+        // Set up EventChannel for Gesture Events
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, GESTURE_EVENT_CHANNEL).setStreamHandler(
             object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    eventSink = events
-                    startGestureRecognition()
+                    GestureEventBus.eventSink = events
                 }
 
                 override fun onCancel(arguments: Any?) {
-                    eventSink = null
-                    stopGestureRecognition()
+                    GestureEventBus.eventSink = null
                 }
             }
         )
 
+        // Setup MethodChannel for GestureService control
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, GESTURE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "startService" -> {
+                        startGestureService()
+                        result.success(null)
+                    }
+                    "stopService" -> {
+                        stopGestureService()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
         // Set up MethodChannel for Volume Control
-        io.flutter.plugin.common.MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.example.spartial_touch/volume").setMethodCallHandler { call, result ->
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VOLUME_CHANNEL).setMethodCallHandler { call, result ->
             val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
             if (call.method == "volumeUp") {
                 audioManager.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_RAISE, android.media.AudioManager.FLAG_SHOW_UI)
@@ -45,23 +61,17 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun startGestureRecognition() {
-        mediaPipeHandLandmarker = MediaPipeHandLandmarker(this) { gesture ->
-            runOnUiThread {
-                eventSink?.success(gesture)
-            }
+    private fun startGestureService() {
+        val intent = Intent(this, GestureService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
         }
-        
-        // Activity implements LifecycleOwner directly in AndroidX component frameworks.
-        cameraManager = CameraManager(this, this as LifecycleOwner) { bitmap, rotation ->
-            mediaPipeHandLandmarker.detectLiveStream(bitmap, rotation)
-        }
-        cameraManager.startCamera()
     }
 
-    private fun stopGestureRecognition() {
-        if (::cameraManager.isInitialized) {
-            cameraManager.stopCamera()
-        }
+    private fun stopGestureService() {
+        val intent = Intent(this, GestureService::class.java)
+        stopService(intent)
     }
 }
