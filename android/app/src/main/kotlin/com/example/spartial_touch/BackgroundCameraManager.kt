@@ -12,20 +12,31 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-class CameraManager(
+class BackgroundCameraManager(
     private val context: Context,
-    private val lifecycleOwner: LifecycleOwner,
-    private val onFrame: (Bitmap, Int) -> Unit
-) {
+    private val onFrame: (Bitmap, Long) -> Unit
+) : LifecycleOwner {
+
+    private val lifecycleRegistry = LifecycleRegistry(this)
     private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var imageAnalyzer: ImageAnalysis? = null
 
-    fun startCamera() {
+    init {
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
+    }
+
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
+
+    fun start() {
+        lifecycleRegistry.currentState = Lifecycle.State.STARTED
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
         cameraProviderFuture.addListener({
@@ -36,10 +47,10 @@ class CameraManager(
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
                         val bitmap = imageProxy.image?.toBitmap()
+                        val timestamp = imageProxy.imageInfo.timestamp
                         if (bitmap != null) {
-                            onFrame(bitmap, rotationDegrees)
+                            onFrame(bitmap, timestamp)
                         }
                         imageProxy.close()
                     }
@@ -50,16 +61,18 @@ class CameraManager(
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
-                    lifecycleOwner, cameraSelector, imageAnalyzer
+                    this, cameraSelector, imageAnalyzer
                 )
+                lifecycleRegistry.currentState = Lifecycle.State.RESUMED
             } catch (exc: Exception) {
-                Log.e("CameraManager", "Use case binding failed", exc)
+                Log.e("BackgroundCameraManager", "Use case binding failed", exc)
             }
 
         }, ContextCompat.getMainExecutor(context))
     }
 
-    fun stopCamera() {
+    fun stop() {
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
         cameraProvider.unbindAll()
