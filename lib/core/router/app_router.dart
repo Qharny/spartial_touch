@@ -9,6 +9,7 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/profile/profile_editor_screen.dart';
 import '../../features/gestures/gesture_library_screen.dart';
 import '../../features/gestures/gesture_detail_screen.dart';
+import '../../features/gestures/custom_gesture_screen.dart';
 import '../../features/gestures/gesture_tester_screen.dart';
 import '../../features/calibration/calibration_screen.dart';
 import '../../features/settings/settings_screen.dart';
@@ -34,6 +35,7 @@ abstract final class AppRouter {
       AppRoutes.profile => _fadeSlide(const ProfileScreen(), settings),
       AppRoutes.profileEditor => _slide(const ProfileEditorScreen(), settings),
       AppRoutes.gestureLibrary => _fadeSlide(const GestureLibraryScreen(), settings),
+      AppRoutes.customGesture => _slide(const CustomGestureScreen(), settings),
       AppRoutes.gestureDetail => _slide(const GestureDetailScreen(), settings),
       AppRoutes.gestureTester => _fade(const GestureTesterScreen(), settings),
       AppRoutes.calibration => _slide(const CalibrationScreen(), settings),

@@ -1,0 +1,29 @@
+ ┌───────────────┬──────────────────────────────────────────────────────────────────────────────────┬─────────────────────────────┐  
+  │     Step      │                                  Primary action                                  │      Secondary action       │  
+  ├───────────────┼──────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┤  
+  │ Welcome       │ Advance                                                                          │ Skip whole funnel → persist │  
+  │               │                                                                                  │  + Dashboard                │  
+  ├───────────────┼──────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┤  
+  │ Camera        │ Permission.camera.request() → advance on grant; snackbar + open settings if      │ Open app settings (manual   │  
+  │               │ permanently denied                                                               │ enable)                     │  
+  ├───────────────┼──────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┤  
+  │ Accessibility │ Deep-link to Accessibility settings (AppSettingsType.accessibility), mark        │ "I've already enabled it" → │  
+  │               │ visited; button becomes "Continue"                                               │  advance                    │  
+  ├───────────────┼──────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┤  
+  │ Overlay       │ Permission.systemAlertWindow.request() → advance (optional)                      │ Skip → advance              │  
+  ├───────────────┼──────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┤  
+  │ Calibration   │ Runs a ~2.2s calibration sweep with a spinner, then advances                     │ Skip → advance              │  
+  ├───────────────┼──────────────────────────────────────────────────────────────────────────────────┼─────────────────────────────┤  
+  │ First profile │ Persist completion → Dashboard                                                   │ Skip → persist → Dashboard  │  
+  └───────────────┴──────────────────────────────────────────────────────────────────────────────────┴─────────────────────────────┘  
+
+  UX feedback
+  - Primary button shows a spinner while a request/calibration is in flight and locks input (secondary dims too).
+  - A "✓ Permission granted" chip appears once a step is satisfied, and the button label flips to "Continue" so re-visiting a granted 
+  step just advances.
+
+  flutter analyze is clean.
+
+  One caveat: the actual permission dialogs and the accessibility deep-link only exercise on a real Android device/emulator — they    
+  can't be observed on the Windows dev host. If you want, point me at a connected device and I can do a build + manual run to verify  
+  the flow end-to-end.
