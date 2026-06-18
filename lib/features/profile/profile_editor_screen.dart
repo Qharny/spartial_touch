@@ -181,7 +181,9 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
     
     // Save active apps list
     final activePackages = _activeApps.map((a) => a.packageName).toList();
+    final activeNames = _activeApps.map((a) => a.name).toList();
     await prefs.setStringList('active_apps_packages', activePackages);
+    await prefs.setStringList('active_apps_names', activeNames);
     
     // Save settings per package name
     for (var app in _activeApps) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 
@@ -16,6 +17,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _sounds = false;
   bool _dnd = true;
   bool _highRefresh = true;
+  String _activeAppsSubtitle = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActiveApps();
+  }
+
+  Future<void> _loadActiveApps() async {
+    final prefs = await SharedPreferences.getInstance();
+    final names = prefs.getStringList('active_apps_names') ?? [];
+    if (mounted) {
+      setState(() {
+        if (names.isEmpty) {
+          _activeAppsSubtitle = 'None';
+        } else {
+          _activeAppsSubtitle = names.join(', ');
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +63,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 12),
           _SettingsCard(
             title: 'Connected Apps',
-            subtitle: 'TikTok, YouTube, Spotify, and more',
+            subtitle: _activeAppsSubtitle,
             icon: Icons.apps_rounded,
-            onTap: () => Navigator.of(context).pushNamed(AppRoutes.profileEditor),
+            onTap: () async {
+              await Navigator.of(context).pushNamed(AppRoutes.profileEditor);
+              _loadActiveApps();
+            },
           ),
           const SizedBox(height: 12),
           _SettingsCard(
