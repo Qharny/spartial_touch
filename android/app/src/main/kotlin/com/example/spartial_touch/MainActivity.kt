@@ -11,6 +11,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         const val GESTURE_CHANNEL = "com.example.spartial_touch/gestures"
         const val GESTURE_EVENT_CHANNEL = "com.example.spartial_touch/gesture_events"
+        const val CAMERA_FRAME_CHANNEL = "com.example.spartial_touch/camera_frames"
         const val VOLUME_CHANNEL = "com.example.spartial_touch/volume"
     }
 
@@ -26,6 +27,19 @@ class MainActivity : FlutterActivity() {
 
                 override fun onCancel(arguments: Any?) {
                     GestureEventBus.eventSink = null
+                }
+            }
+        )
+
+        // Set up EventChannel for Camera Frames
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, CAMERA_FRAME_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    CameraFrameEventBus.eventSink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    CameraFrameEventBus.eventSink = null
                 }
             }
         )

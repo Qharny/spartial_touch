@@ -21,6 +21,17 @@ object GestureEventBus {
     }
 }
 
+object CameraFrameEventBus {
+    var eventSink: EventChannel.EventSink? = null
+
+    fun sendFrame(bytes: ByteArray) {
+        // Must be called on main thread
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            eventSink?.success(bytes)
+        }
+    }
+}
+
 class GestureService : Service() {
     private lateinit var handTracker: HandTracker
     private lateinit var cameraManager: BackgroundCameraManager
@@ -34,8 +45,9 @@ class GestureService : Service() {
         }
         handTracker.init()
 
-        cameraManager = BackgroundCameraManager(this) { bitmap, timestamp ->
+        cameraManager = BackgroundCameraManager(this) { bitmap, bytes, timestamp ->
             handTracker.processFrame(bitmap, timestamp)
+            CameraFrameEventBus.sendFrame(bytes)
         }
         cameraManager.start()
     }

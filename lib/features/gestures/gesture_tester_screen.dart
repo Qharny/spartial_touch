@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../main.dart';
+import '../../core/services/gesture_channel.dart';
 
 import '../../core/services/volume_service.dart';
 
@@ -96,11 +98,35 @@ class _GestureTesterScreenState extends State<GestureTesterScreen> {
                       border: Border.all(color: const Color(0xFF2A2A3A), width: 4),
                     ),
                   ),
-                  // Hand icon mock to simulate hand recognition in the camera feed
-                  const Icon(
-                    Icons.pan_tool_rounded,
-                    size: 100,
-                    color: Color(0xFF4A4A5A),
+                  // Live camera view from native service
+                  ClipOval(
+                    child: SizedBox(
+                      width: 240,
+                      height: 240,
+                      child: StreamBuilder<Uint8List>(
+                        stream: GestureChannel.cameraFrameStream,
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData) {
+                            return RotatedBox(
+                              quarterTurns: 1, // Rotate 90 degrees for portrait
+                              child: Transform.scale(
+                                scaleX: -1, // Mirror front camera
+                                child: Image.memory(
+                                  snapshot.data!,
+                                  fit: BoxFit.cover,
+                                  gaplessPlayback: true,
+                                ),
+                              ),
+                            );
+                          }
+                          return const Icon(
+                            Icons.pan_tool_rounded,
+                            size: 100,
+                            color: Color(0xFF4A4A5A),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                   // Center tracking box
                   Container(

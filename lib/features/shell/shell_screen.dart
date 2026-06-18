@@ -77,7 +77,7 @@ class _CustomNavBar extends StatelessWidget {
                 onTap: () => onItemSelected(1),
               ),
               _NavBarIcon(
-                icon: Icons.handshake,
+                icon: Icons.pan_tool,
                 isSelected: selectedIndex == 2,
                 onTap: () => onItemSelected(2),
               ),

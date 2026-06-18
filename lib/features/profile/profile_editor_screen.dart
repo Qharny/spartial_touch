@@ -26,7 +26,7 @@ class ProfileEditorScreen extends StatefulWidget {
 
 class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   List<AppInfo> _installedApps = [];
-  AppInfo? _selectedApp;
+  List<AppInfo> _activeApps = [];
   bool _loadingApps = true;
 
   final Map<String, String> _gestureMappings = {
@@ -50,11 +50,16 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
       // Sort apps alphabetically
       apps.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       
+      final prefs = await SharedPreferences.getInstance();
+      final savedPackages = prefs.getStringList('active_apps_packages') ?? [];
+      
       if (mounted) {
         setState(() {
           _installedApps = apps;
-          if (apps.isNotEmpty) {
-            _selectedApp = apps.first;
+          if (savedPackages.isNotEmpty) {
+            _activeApps = apps.where((a) => savedPackages.contains(a.packageName)).toList();
+          } else if (apps.isNotEmpty) {
+            _activeApps = [apps.first];
           }
           _loadingApps = false;
         });
@@ -71,40 +76,64 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
 
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return ListView.builder(
-          shrinkWrap: true,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          itemCount: _installedApps.length,
-          itemBuilder: (ctx, index) {
-            final app = _installedApps[index];
-            return ListTile(
-              leading: app.icon != null
-                  ? Image.memory(app.icon!, width: 32, height: 32)
-                  : const Icon(Icons.android, size: 32),
-              title: Text(
-                app.name,
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              subtitle: Text(
-                app.packageName,
-                style: const TextStyle(fontSize: 10),
-              ),
-              trailing: _selectedApp?.packageName == app.packageName
-                  ? Icon(Icons.check_circle_rounded, color: AppColorsShared.accent)
-                  : null,
-              onTap: () {
-                setState(() => _selectedApp = app);
-                Navigator.of(ctx).pop();
-              },
-            );
-          },
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setModalState) {
+              return DraggableScrollableSheet(
+                expand: false,
+                initialChildSize: 0.6,
+                minChildSize: 0.4,
+                maxChildSize: 0.9,
+                builder: (_, controller) {
+                  return ListView.builder(
+                    controller: controller,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    itemCount: _installedApps.length,
+                    itemBuilder: (ctx, index) {
+                      final app = _installedApps[index];
+                      final isSelected = _activeApps.any((a) => a.packageName == app.packageName);
+                      return ListTile(
+                        leading: app.icon != null
+                            ? Image.memory(app.icon!, width: 32, height: 32)
+                            : const Icon(Icons.android, size: 32),
+                        title: Text(
+                          app.name,
+                          style: const TextStyle(
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          app.packageName,
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle_rounded, color: AppColorsShared.accent)
+                            : const Icon(Icons.circle_outlined),
+                        onTap: () {
+                          setModalState(() {
+                            if (isSelected) {
+                              _activeApps.removeWhere((a) => a.packageName == app.packageName);
+                            } else {
+                              _activeApps.add(app);
+                            }
+                          });
+                          setState(() {}); // Update the background screen immediately
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );
@@ -146,20 +175,26 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_selectedApp == null) return;
+    if (_activeApps.isEmpty) return;
     
     final prefs = await SharedPreferences.getInstance();
     
+    // Save active apps list
+    final activePackages = _activeApps.map((a) => a.packageName).toList();
+    await prefs.setStringList('active_apps_packages', activePackages);
+    
     // Save settings per package name
-    final pkg = _selectedApp!.packageName;
-    for (var entry in _gestureMappings.entries) {
-      await prefs.setString('gesture_${pkg}_${entry.key}', entry.value);
+    for (var app in _activeApps) {
+      final pkg = app.packageName;
+      for (var entry in _gestureMappings.entries) {
+        await prefs.setString('gesture_${pkg}_${entry.key}', entry.value);
+      }
     }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${_selectedApp!.name} profile saved!'),
+          content: Text('Profile saved for ${_activeApps.length} app(s)!'),
           backgroundColor: AppColorsShared.accent,
         ),
       );
@@ -191,9 +226,9 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         children: [
-          // ── ACTIVE APPLICATION ───────────────────────────────────────────
+          // ── ACTIVE APPLICATIONS ───────────────────────────────────────────
           Text(
-            'ACTIVE APPLICATION',
+            'ACTIVE APPLICATIONS',
             style: TextStyle(
               fontFamily: 'Space Mono',
               fontSize: 11,
@@ -206,46 +241,70 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
           
           if (_loadingApps)
             const Center(child: CircularProgressIndicator())
-          else if (_selectedApp != null)
+          else ...[
+            if (_activeApps.isNotEmpty)
+              Container(
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.outline),
+                ),
+                child: Column(
+                  children: _activeApps.map((app) {
+                    return ListTile(
+                      leading: app.icon != null
+                          ? Image.memory(app.icon!, width: 32, height: 32)
+                          : const Icon(Icons.android, size: 32),
+                      title: Text(
+                        app.name,
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
+                        onPressed: () {
+                          setState(() {
+                            _activeApps.remove(app);
+                          });
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            
+            const SizedBox(height: 12),
             GestureDetector(
               onTap: _showAppSelector,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: cs.surface,
+                  color: cs.surfaceContainerHighest.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: cs.outline),
+                  border: Border.all(color: cs.outline, style: BorderStyle.solid),
                 ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _selectedApp!.icon != null
-                        ? Image.memory(_selectedApp!.icon!, width: 32, height: 32)
-                        : const Icon(Icons.android, size: 32),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _selectedApp!.name,
-                            style: TextStyle(
-                              fontFamily: 'Inter',
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                        ],
+                    Icon(Icons.add_rounded, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Add more apps',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w600,
+                        color: cs.primary,
                       ),
                     ),
-                    Icon(Icons.keyboard_arrow_down_rounded,
-                        color: cs.onSurfaceVariant),
                   ],
                 ),
               ),
-            )
-          else
-             const Text('No apps found'),
+            ),
+          ],
 
           const SizedBox(height: 32),
 

@@ -21,7 +21,7 @@ import java.util.concurrent.Executors
 
 class BackgroundCameraManager(
     private val context: Context,
-    private val onFrame: (Bitmap, Long) -> Unit
+    private val onFrame: (Bitmap, ByteArray, Long) -> Unit
 ) : LifecycleOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -47,10 +47,10 @@ class BackgroundCameraManager(
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        val bitmap = imageProxy.image?.toBitmap()
+                        val (bitmap, bytes) = imageProxy.image?.toBitmapAndBytes() ?: Pair(null, null)
                         val timestamp = imageProxy.imageInfo.timestamp
-                        if (bitmap != null) {
-                            onFrame(bitmap, timestamp)
+                        if (bitmap != null && bytes != null) {
+                            onFrame(bitmap, bytes, timestamp)
                         }
                         imageProxy.close()
                     }
@@ -79,9 +79,9 @@ class BackgroundCameraManager(
         cameraExecutor.shutdown()
     }
 
-    private fun Image.toBitmap(): Bitmap? {
+    private fun Image.toBitmapAndBytes(): Pair<Bitmap?, ByteArray?> {
         if (format != ImageFormat.YUV_420_888) {
-            return null
+            return Pair(null, null)
         }
         val yBuffer = planes[0].buffer // Y
         val vuBuffer = planes[2].buffer // VU
@@ -96,8 +96,9 @@ class BackgroundCameraManager(
 
         val yuvImage = YuvImage(nv21, ImageFormat.NV21, this.width, this.height, null)
         val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 100, out)
+        yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 80, out)
         val imageBytes = out.toByteArray()
-        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        return Pair(bitmap, imageBytes)
     }
 }
