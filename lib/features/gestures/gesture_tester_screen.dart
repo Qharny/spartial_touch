@@ -1,7 +1,58 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../main.dart';
 
-class GestureTesterScreen extends StatelessWidget {
+import '../../core/services/volume_service.dart';
+
+class GestureTesterScreen extends StatefulWidget {
   const GestureTesterScreen({super.key});
+
+  @override
+  State<GestureTesterScreen> createState() => _GestureTesterScreenState();
+}
+
+class _GestureTesterScreenState extends State<GestureTesterScreen> {
+  String _detectedGesture = 'Waiting...';
+  StreamSubscription? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermissionAndListen();
+  }
+
+  Future<void> _checkPermissionAndListen() async {
+    final status = await Permission.camera.request();
+    if (status.isGranted) {
+      gestureRecognitionService.startListening();
+      _subscription = gestureRecognitionService.gestureStream.listen((gesture) {
+        if (mounted) {
+          setState(() {
+            _detectedGesture = gesture;
+          });
+          if (gesture == "Wave Up") {
+            VolumeService.volumeUp();
+          } else if (gesture == "Wave Down") {
+            VolumeService.volumeDown();
+          }
+        }
+      });
+    } else {
+      if (mounted) {
+        setState(() {
+          _detectedGesture = 'Camera permission denied';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    gestureRecognitionService.stopListening();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,9 +136,9 @@ class GestureTesterScreen extends StatelessWidget {
             const SizedBox(height: 48),
 
             // ── Result Text ───────────────────────────────────────────────
-            const Text(
-              'Wave Up',
-              style: TextStyle(
+            Text(
+              _detectedGesture,
+              style: const TextStyle(
                 fontFamily: 'Inter',
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
