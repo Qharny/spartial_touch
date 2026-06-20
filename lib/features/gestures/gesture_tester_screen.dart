@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../main.dart';
 import '../../core/services/gesture_channel.dart';
-
+import '../../core/services/gesture_recognition_service.dart';
 import '../../core/services/volume_service.dart';
 
 class GestureTesterScreen extends StatefulWidget {
@@ -16,6 +16,7 @@ class GestureTesterScreen extends StatefulWidget {
 
 class _GestureTesterScreenState extends State<GestureTesterScreen> {
   String _detectedGesture = 'Waiting...';
+  double _confidence = 0.0;
   StreamSubscription? _subscription;
 
   @override
@@ -28,14 +29,15 @@ class _GestureTesterScreenState extends State<GestureTesterScreen> {
     final status = await Permission.camera.request();
     if (status.isGranted) {
       gestureRecognitionService.startListening();
-      _subscription = gestureRecognitionService.gestureStream.listen((gesture) {
+      _subscription = gestureRecognitionService.gestureStream.listen((event) {
         if (mounted) {
           setState(() {
-            _detectedGesture = gesture;
+            _detectedGesture = event.name;
+            _confidence = event.confidence;
           });
-          if (gesture == "Wave Up") {
+          if (event.name == 'Wave Up') {
             VolumeService.volumeUp();
-          } else if (gesture == "Wave Down") {
+          } else if (event.name == 'Wave Down') {
             VolumeService.volumeDown();
           }
         }
@@ -172,16 +174,19 @@ class _GestureTesterScreenState extends State<GestureTesterScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '98% CONFIDENCE',
-              style: TextStyle(
-                fontFamily: 'Space Mono',
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
-                color: Color(0xFF7A7890),
-              ),
-            ),
+            if (_detectedGesture != 'Waiting...' && _detectedGesture != 'Camera permission denied')
+              Text(
+                '${(_confidence * 100).toInt()}% CONFIDENCE',
+                style: const TextStyle(
+                  fontFamily: 'Space Mono',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                  color: Color(0xFF7A7890),
+                ),
+              )
+            else
+              const SizedBox(height: 14), // Placeholder height for consistency
             const SizedBox(height: 48),
 
             // ── Action Pill ───────────────────────────────────────────────

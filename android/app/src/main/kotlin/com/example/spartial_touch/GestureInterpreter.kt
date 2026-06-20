@@ -19,13 +19,11 @@ object GestureInterpreter {
     private var lastGestureTime = 0L
     private const val COOLDOWN_MS = 800L
 
-    fun interpret(landmarks: List<NormalizedLandmark>): String? {
+    fun interpret(landmarks: List<NormalizedLandmark>, confidence: Float): String? {
         val now = System.currentTimeMillis()
         if (now - lastGestureTime < COOLDOWN_MS) return null
 
         val wrist = landmarks[WRIST]
-        val indexTip = landmarks[INDEX_TIP]
-        val thumbTip = landmarks[THUMB_TIP]
 
         // Update motion history
         wristHistory.addLast(Pair(wrist.x(), wrist.y()))
@@ -51,9 +49,11 @@ object GestureInterpreter {
         if (gesture != null) {
             lastGestureTime = now
             wristHistory.clear()
+            // Return structured payload: "GESTURE_NAME:confidence"
+            return "$gesture:${String.format("%.4f", confidence)}"
         }
 
-        return gesture
+        return null
     }
 
     private fun isPinch(lm: List<NormalizedLandmark>): Boolean {
