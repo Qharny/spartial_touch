@@ -18,10 +18,13 @@ object GestureInterpreter {
     private const val HISTORY_SIZE = 8
     private var lastGestureTime = 0L
     private const val COOLDOWN_MS = 800L
+    private const val MIN_CONFIDENCE = 0.75f  // Reject detections below this threshold
 
     fun interpret(landmarks: List<NormalizedLandmark>, confidence: Float): String? {
         val now = System.currentTimeMillis()
         if (now - lastGestureTime < COOLDOWN_MS) return null
+        // Confidence gate: reject noisy/uncertain detections
+        if (confidence < MIN_CONFIDENCE) return null
 
         val wrist = landmarks[WRIST]
 
