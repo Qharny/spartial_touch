@@ -69,6 +69,17 @@ class MainActivity : FlutterActivity() {
                             result.error("INVALID_ARGUMENT", "Action argument is null", null)
                         }
                     }
+                    "loadProfiles" -> {
+                        // Argument: Map<packageName, Map<gestureKey, actionId>>
+                        @Suppress("UNCHECKED_CAST")
+                        val profiles = call.arguments as? Map<String, Map<String, String>>
+                        if (profiles != null) {
+                            GestureService.instance?.loadProfileMappings(profiles)
+                            result.success(null)
+                        } else {
+                            result.error("INVALID_ARGUMENT", "Expected Map<String,Map<String,String>>", null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
