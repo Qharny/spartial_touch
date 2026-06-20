@@ -35,26 +35,63 @@ object CameraFrameEventBus {
 class GestureService : Service() {
     private lateinit var handTracker: HandTracker
     private lateinit var cameraManager: BackgroundCameraManager
+    private lateinit var smartWake: SmartWakeManager
+    private lateinit var overlay: OverlayManager
+
+    private var isCameraRunning = false
 
     override fun onCreate() {
         super.onCreate()
         startForegroundNotification()
 
-        handTracker = HandTracker(this) { gesture ->
-            GestureEventBus.sendEvent(gesture)
+        // Floating overlay — shows engine status over other apps
+        overlay = OverlayManager(this)
+        overlay.show()
+        overlay.setSleeping()
+
+        // Hand tracker — calls back with "GESTURE:confidence" payload
+        handTracker = HandTracker(this) { gesturePayload ->
+            GestureEventBus.sendEvent(gesturePayload)
+            // Extract the gesture name part for the overlay flash
+            val gestureName = gesturePayload.substringBefore(':')
+                .split('_')
+                .joinToString(" ") { it.lowercase().replaceFirstChar(Char::uppercaseChar) }
+            overlay.flashGesture(gestureName)
         }
         handTracker.init()
 
+        // Camera — only processes frames when SmartWake says so
         cameraManager = BackgroundCameraManager(this) { bitmap, bytes, timestamp ->
             handTracker.processFrame(bitmap, timestamp)
             CameraFrameEventBus.sendFrame(bytes)
         }
-        cameraManager.start()
+
+        // SmartWake — gates camera on proximity + accelerometer
+        smartWake = SmartWakeManager(
+            context = this,
+            onWake = {
+                if (!isCameraRunning) {
+                    isCameraRunning = true
+                    cameraManager.start()
+                    overlay.setActive()
+                }
+            },
+            onSleep = {
+                if (isCameraRunning) {
+                    isCameraRunning = false
+                    cameraManager.stop()
+                    overlay.setSleeping()
+                }
+            }
+        )
+        smartWake.start()
     }
 
     override fun onDestroy() {
-        cameraManager.stop()
+        smartWake.stop()
+        if (isCameraRunning) cameraManager.stop()
         handTracker.close()
+        overlay.dismiss()
         super.onDestroy()
     }
 
@@ -81,7 +118,7 @@ class GestureService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Spatial Touch Gestures")
             .setContentText("Listening for hand gestures...")
-            .setSmallIcon(android.R.drawable.ic_menu_camera) // You can replace with app icon
+            .setSmallIcon(android.R.drawable.ic_menu_camera) // Replace with app icon
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
