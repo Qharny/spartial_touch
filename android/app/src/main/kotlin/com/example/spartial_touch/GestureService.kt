@@ -37,6 +37,7 @@ class GestureService : Service() {
     private lateinit var cameraManager: BackgroundCameraManager
     private lateinit var smartWake: SmartWakeManager
     private lateinit var overlay: OverlayManager
+    val actionDispatcher by lazy { ActionDispatcher(this) }
 
     private var isCameraRunning = false
 
@@ -52,7 +53,9 @@ class GestureService : Service() {
         // Hand tracker — calls back with "GESTURE:confidence" payload
         handTracker = HandTracker(this) { gesturePayload ->
             GestureEventBus.sendEvent(gesturePayload)
-            // Extract the gesture name part for the overlay flash
+            // Dispatch action based on active profile mapping
+            actionDispatcher.dispatch(gesturePayload)
+            // Extract gesture name for overlay flash
             val gestureName = gesturePayload.substringBefore(':')
                 .split('_')
                 .joinToString(" ") { it.lowercase().replaceFirstChar(Char::uppercaseChar) }
