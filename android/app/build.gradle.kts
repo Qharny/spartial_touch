@@ -54,4 +54,7 @@ dependencies {
 
     // MediaPipe Hand Landmarker
     implementation("com.google.mediapipe:tasks-vision:0.10.14")
+
+    // Unit tests
+    testImplementation("junit:junit:4.13.2")
 }
