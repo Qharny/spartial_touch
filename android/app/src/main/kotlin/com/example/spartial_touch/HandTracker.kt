@@ -47,7 +47,16 @@ class HandTracker(
         if (result.landmarks().isEmpty()) return
 
         val landmarks = result.landmarks()[0] // first hand
-        val gesture = GestureInterpreter.interpret(landmarks)
+
+        // Extract the hand presence confidence from MediaPipe result
+        val confidence: Float = if (result.handedness().isNotEmpty() &&
+            result.handedness()[0].isNotEmpty()) {
+            result.handedness()[0][0].score()
+        } else {
+            0f
+        }
+
+        val gesture = GestureInterpreter.interpret(landmarks, confidence)
 
         if (gesture != null) {
             onGestureDetected(gesture)
