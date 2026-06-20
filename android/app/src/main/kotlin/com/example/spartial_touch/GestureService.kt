@@ -64,6 +64,12 @@ class GestureService : Service() {
             GestureEventBus.sendEvent(gesturePayload)
             // Dispatch action based on active profile mapping
             actionDispatcher.dispatch(gesturePayload)
+            // Haptic feedback if enabled
+            val hapticsEnabled = getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                .getBoolean("haptics_enabled", true)
+            if (hapticsEnabled) {
+                HapticService.pulse(this, "medium")
+            }
             // Extract gesture name for overlay flash
             val gestureName = gesturePayload.substringBefore(':')
                 .split('_')
