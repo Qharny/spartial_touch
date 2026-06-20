@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/router/router.dart';
 import 'core/theme/theme.dart';
 
 import 'core/services/gesture_recognition_service.dart';
+import 'core/services/active_hours_scheduler.dart';
 
 final gestureRecognitionService = GestureRecognitionService();
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Lock to portrait by default — remove if landscape is needed.
@@ -24,6 +26,12 @@ void main() {
     systemNavigationBarColor: Colors.white,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
+
+  final prefs = await SharedPreferences.getInstance();
+  final serviceEnabled = prefs.getBool('gesture_service_enabled') ?? false;
+  if (serviceEnabled) {
+    await ActiveHoursScheduler.instance.start_();
+  }
 
   runApp(const SpartialTouchApp());
 }

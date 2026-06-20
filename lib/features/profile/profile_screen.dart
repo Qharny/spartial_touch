@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
+import '../../core/services/performance_mode_service.dart';
+import '../../core/services/active_hours_scheduler.dart';
+import '../../core/services/gesture_channel.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,16 +16,40 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _enableVisuals = true;
   double _opacity = 0.8;
-  double _haptic = 0.6;
+  bool _hapticsEnabled = true;
   bool _sounds = false;
   bool _dnd = true;
-  bool _highRefresh = true;
+  PerformanceMode _performanceMode = PerformanceMode.balanced;
+
+  bool _activeHoursEnabled = false;
+  TimeOfDay _activeHoursStart = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay _activeHoursEnd = const TimeOfDay(hour: 22, minute: 0);
+
   String _activeAppsSubtitle = 'Loading...';
 
   @override
   void initState() {
     super.initState();
     _loadActiveApps();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mode = await PerformanceModeService.load();
+    final ahEnabled = await ActiveHoursScheduler.instance.isEnabled();
+    final ahStart = await ActiveHoursScheduler.instance.getStartTime();
+    final ahEnd = await ActiveHoursScheduler.instance.getEndTime();
+
+    if (mounted) {
+      setState(() {
+        _hapticsEnabled = prefs.getBool('haptics_enabled') ?? true;
+        _performanceMode = mode;
+        _activeHoursEnabled = ahEnabled;
+        _activeHoursStart = ahStart;
+        _activeHoursEnd = ahEnd;
+      });
+    }
   }
 
   Future<void> _loadActiveApps() async {
@@ -81,10 +108,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 32),
           const _SettingsSectionTitle(title: 'Preferences'),
           const SizedBox(height: 12),
-          
           _ExpandableSettingsCard(
             title: 'Overlay & Performance',
-            subtitle: 'Visuals, opacity, and refresh rate',
+            subtitle: 'Visuals, opacity, and performance preset',
             icon: Icons.layers_outlined,
             children: [
               _SettingsRow(
@@ -109,13 +135,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               _SettingsRow(
-                label: 'High Refresh Rate',
+                label: 'Performance Preset',
                 showDivider: false,
-                trailing: Switch(
-                  value: _highRefresh,
-                  onChanged: (v) => setState(() => _highRefresh = v),
-                  activeThumbColor: cs.surface,
-                  activeTrackColor: AppColorsShared.accent,
+                trailing: DropdownButton<PerformanceMode>(
+                  value: _performanceMode,
+                  underline: const SizedBox(),
+                  onChanged: (mode) async {
+                    if (mode != null) {
+                      setState(() {
+                        _performanceMode = mode;
+                      });
+                      await PerformanceModeService.save(mode);
+                      await GestureChannel.setPerformanceMode(
+                        fps: mode.fps,
+                        cooldownMs: mode.cooldownMs,
+                      );
+                    }
+                  },
+                  items: PerformanceMode.values.map((mode) {
+                    return DropdownMenuItem<PerformanceMode>(
+                      value: mode,
+                      child: Text(
+                        mode.label,
+                        style: TextStyle(color: cs.onSurface),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _performanceMode.description,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -124,19 +183,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           _ExpandableSettingsCard(
             title: 'Feedback & Schedule',
-            subtitle: 'Haptics, sounds, and DND',
+            subtitle: 'Haptics, sounds, and active hours',
             icon: Icons.vibration_rounded,
             children: [
               _SettingsRow(
-                label: 'Haptic Intensity',
-                trailing: SizedBox(
-                  width: 120,
-                  child: Slider(
-                    value: _haptic,
-                    onChanged: (v) => setState(() => _haptic = v),
-                    activeColor: cs.onSurface,
-                    inactiveColor: cs.outline,
-                  ),
+                label: 'Haptic Feedback',
+                trailing: Switch(
+                  value: _hapticsEnabled,
+                  onChanged: (v) async {
+                    setState(() => _hapticsEnabled = v);
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('haptics_enabled', v);
+                    await GestureChannel.setHapticsEnabled(v);
+                  },
+                  activeThumbColor: cs.surface,
+                  activeTrackColor: AppColorsShared.accent,
                 ),
               ),
               _SettingsRow(
@@ -150,7 +211,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               _SettingsRow(
                 label: 'Do Not Disturb',
-                showDivider: false,
                 trailing: Switch(
                   value: _dnd,
                   onChanged: (v) => setState(() => _dnd = v),
@@ -158,6 +218,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   activeTrackColor: AppColorsShared.accent,
                 ),
               ),
+              _SettingsRow(
+                label: 'Enable Active Hours',
+                showDivider: _activeHoursEnabled,
+                trailing: Switch(
+                  value: _activeHoursEnabled,
+                  onChanged: (v) async {
+                    setState(() => _activeHoursEnabled = v);
+                    await ActiveHoursScheduler.instance.save(
+                      enabled: v,
+                      start: _activeHoursStart,
+                      end: _activeHoursEnd,
+                    );
+                  },
+                  activeThumbColor: cs.surface,
+                  activeTrackColor: AppColorsShared.accent,
+                ),
+              ),
+              if (_activeHoursEnabled) ...[
+                _SettingsRow(
+                  label: 'Start Time',
+                  trailing: Text(
+                    _activeHoursStart.format(context),
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: _activeHoursStart,
+                    );
+                    if (time != null) {
+                      setState(() => _activeHoursStart = time);
+                      await ActiveHoursScheduler.instance.save(
+                        enabled: _activeHoursEnabled,
+                        start: time,
+                        end: _activeHoursEnd,
+                      );
+                    }
+                  },
+                ),
+                _SettingsRow(
+                  label: 'End Time',
+                  showDivider: false,
+                  trailing: Text(
+                    _activeHoursEnd.format(context),
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: _activeHoursEnd,
+                    );
+                    if (time != null) {
+                      setState(() => _activeHoursEnd = time);
+                      await ActiveHoursScheduler.instance.save(
+                        enabled: _activeHoursEnabled,
+                        start: _activeHoursStart,
+                        end: time,
+                      );
+                    }
+                  },
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -179,7 +309,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-
+          const SizedBox(height: 12),
           const SizedBox(height: 32),
           const _SettingsSectionTitle(title: 'Support'),
           const SizedBox(height: 12),
@@ -236,14 +366,12 @@ class _SettingsCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.trailing,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
-  final Widget? trailing;
   final VoidCallback onTap;
 
   @override
@@ -296,7 +424,7 @@ class _SettingsCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null) trailing! else Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
           ],
         ),
       ),

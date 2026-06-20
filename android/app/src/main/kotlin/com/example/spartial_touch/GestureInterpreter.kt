@@ -22,8 +22,18 @@ object GestureInterpreter {
     private val indexHistory = ArrayDeque<Pair<Float, Float>>()  // for fist pump (Z-axis proxy)
     private const val HISTORY_SIZE = 8
     private var lastGestureTime = 0L
-    private const val COOLDOWN_MS = 800L
-    private const val MIN_CONFIDENCE = 0.75f
+    private var cooldownMs = 800L         // mutable; updated by applyCooldown()
+    private var minConfidence = 0.75f     // mutable; updated by applyCalibration()
+    private var motionThreshold = 0.12f   // mutable; updated by applyCalibration()
+
+    /** Called from MainActivity when the user changes performance mode. */
+    fun applyCooldown(ms: Long) { cooldownMs = ms }
+
+    /** Called from MainActivity when calibration values are saved. */
+    fun applyCalibration(confidenceThreshold: Float, motionThresholdValue: Float) {
+        minConfidence   = confidenceThreshold
+        motionThreshold = motionThresholdValue
+    }
 
     // Hold gesture tracking (Open Palm Hold)
     private var openPalmStartTime = 0L
@@ -31,8 +41,8 @@ object GestureInterpreter {
 
     fun interpret(landmarks: List<NormalizedLandmark>, confidence: Float): String? {
         val now = System.currentTimeMillis()
-        if (now - lastGestureTime < COOLDOWN_MS) return null
-        if (confidence < MIN_CONFIDENCE) return null
+        if (now - lastGestureTime < cooldownMs) return null
+        if (confidence < minConfidence) return null
 
         val wrist = landmarks[WRIST]
 
@@ -65,7 +75,6 @@ object GestureInterpreter {
         val deltaY = wristHistory.last().second - wristHistory.first().second
 
         // --- Motion Gestures ---
-        val motionThreshold = 0.12f
 
         val gesture = when {
             // Wave directions

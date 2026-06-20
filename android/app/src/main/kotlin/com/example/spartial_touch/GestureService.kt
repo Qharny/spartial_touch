@@ -54,6 +54,15 @@ class GestureService : Service() {
         instance = this
         startForegroundNotification()
 
+        // Load persisted calibration & performance settings
+        val prefs = getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+        val savedConfidence = prefs.getFloat("confidence_threshold", 0.75f)
+        val savedMotion = prefs.getFloat("motion_threshold", 0.12f)
+        GestureInterpreter.applyCalibration(savedConfidence, savedMotion)
+        
+        val savedCooldown = prefs.getLong("cooldown_ms", 800L)
+        GestureInterpreter.applyCooldown(savedCooldown)
+
         // Floating overlay — shows engine status over other apps
         overlay = OverlayManager(this)
         overlay.show()
@@ -64,6 +73,12 @@ class GestureService : Service() {
             GestureEventBus.sendEvent(gesturePayload)
             // Dispatch action based on active profile mapping
             actionDispatcher.dispatch(gesturePayload)
+            // Haptic feedback if enabled
+            val hapticsEnabled = getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                .getBoolean("haptics_enabled", true)
+            if (hapticsEnabled) {
+                HapticService.pulse(this, "medium")
+            }
             // Extract gesture name for overlay flash
             val gestureName = gesturePayload.substringBefore(':')
                 .split('_')

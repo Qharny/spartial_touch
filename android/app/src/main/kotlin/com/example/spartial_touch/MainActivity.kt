@@ -80,6 +80,39 @@ class MainActivity : FlutterActivity() {
                             result.error("INVALID_ARGUMENT", "Expected Map<String,Map<String,String>>", null)
                         }
                     }
+                    "setPerformanceMode" -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val args = call.arguments as? Map<String, Int>
+                        val fps = args?.get("fps") ?: 15
+                        val cooldownMs = args?.get("cooldownMs") ?: 800
+                        GestureInterpreter.applyCooldown(cooldownMs.toLong())
+                        // Persist fps and cooldown for BackgroundCameraManager and GestureInterpreter to read on next start
+                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                            .edit()
+                            .putInt("detection_fps", fps)
+                            .putLong("cooldown_ms", cooldownMs.toLong())
+                            .apply()
+                        result.success(null)
+                    }
+                    "setCalibration" -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val args = call.arguments as? Map<String, Any>
+                        val confidence = (args?.get("confidenceThreshold") as? Double)?.toFloat() ?: 0.75f
+                        val motion = (args?.get("motionThreshold") as? Double)?.toFloat() ?: 0.12f
+                        GestureInterpreter.applyCalibration(confidence, motion)
+                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                            .edit()
+                            .putFloat("confidence_threshold", confidence)
+                            .putFloat("motion_threshold", motion)
+                            .apply()
+                        result.success(null)
+                    }
+                    "setHapticsEnabled" -> {
+                        val enabled = call.arguments as? Boolean ?: true
+                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                            .edit().putBoolean("haptics_enabled", enabled).apply()
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

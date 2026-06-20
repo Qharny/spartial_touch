@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/theme.dart';
+import '../../core/services/calibration_service.dart';
+import '../../core/services/gesture_channel.dart';
 
 /// Standalone calibration wizard — reached from Settings ("Redo Calibration").
-/// Mirrors the calibration step from onboarding but stands on its own so users
-/// can re-run it any time. Both actions return to wherever they came from.
 class CalibrationScreen extends StatefulWidget {
   const CalibrationScreen({super.key});
 
@@ -14,6 +14,9 @@ class CalibrationScreen extends StatefulWidget {
 class _CalibrationScreenState extends State<CalibrationScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
+  double _confidenceThreshold = 0.75;
+  double _motionThreshold = 0.12;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -22,6 +25,34 @@ class _CalibrationScreenState extends State<CalibrationScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final ct = await CalibrationService.instance.getConfidenceThreshold();
+    final mt = await CalibrationService.instance.getMotionThreshold();
+    if (mounted) {
+      setState(() {
+        _confidenceThreshold = ct;
+        _motionThreshold = mt;
+      });
+    }
+  }
+
+  Future<void> _saveAndApply() async {
+    setState(() => _saving = true);
+    await CalibrationService.instance.save(
+      confidenceThreshold: _confidenceThreshold,
+      motionThreshold: _motionThreshold,
+    );
+    await GestureChannel.setCalibration(
+      confidenceThreshold: _confidenceThreshold,
+      motionThreshold: _motionThreshold,
+    );
+    if (mounted) {
+      setState(() => _saving = false);
+      Navigator.of(context).pop(true); // true = calibration completed
+    }
   }
 
   @override
@@ -57,7 +88,7 @@ class _CalibrationScreenState extends State<CalibrationScreen>
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
         child: Column(
           children: [
-            // ── Live calibration target ────────────────────────────────────
+            // ── Animated target ──────────────────────────────────────────────
             Expanded(
               child: Center(
                 child: AnimatedBuilder(
@@ -65,8 +96,8 @@ class _CalibrationScreenState extends State<CalibrationScreen>
                   builder: (context, child) {
                     final t = _pulse.value;
                     return Container(
-                      width: 220 + 20 * t,
-                      height: 220 + 20 * t,
+                      width: 200 + 20 * t,
+                      height: 200 + 20 * t,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColorsShared.accent.withValues(alpha: 0.08),
@@ -78,50 +109,43 @@ class _CalibrationScreenState extends State<CalibrationScreen>
                       child: child,
                     );
                   },
-                  child: Center(
-                    child: Icon(
-                      Icons.pan_tool_rounded,
-                      size: 96,
-                      color: cs.onSurface,
-                    ),
+                  child: const Center(
+                    child: Icon(Icons.pan_tool_rounded, size: 80),
                   ),
                 ),
               ),
             ),
 
-            // ── Title & instructions ───────────────────────────────────────
-            Text(
-              'Hold your hand steady',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-                color: cs.onSurface,
-              ),
+            // ── Confidence slider ─────────────────────────────────────────────
+            _SliderRow(
+              label: 'Confidence Threshold',
+              value: _confidenceThreshold,
+              min: 0.50,
+              max: 0.95,
+              divisions: 9,
+              display: '${(_confidenceThreshold * 100).round()}%',
+              onChanged: (v) => setState(() => _confidenceThreshold = v),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Keep your hand at a natural distance while we re-measure lighting '
-              'and distance thresholds for your environment.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                height: 1.5,
-                color: cs.onSurfaceVariant,
-              ),
+            const SizedBox(height: 8),
+
+            // ── Motion threshold slider ───────────────────────────────────────
+            _SliderRow(
+              label: 'Motion Sensitivity',
+              value: _motionThreshold,
+              min: 0.06,
+              max: 0.25,
+              divisions: 19,
+              display: _motionThreshold.toStringAsFixed(2),
+              onChanged: (v) => setState(() => _motionThreshold = v),
             ),
+            const SizedBox(height: 28),
 
-            const SizedBox(height: 32),
-
-            // ── Actions ─────────────────────────────────────────────────────
+            // ── Save button ──────────────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: _saving ? null : _saveAndApply,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColorsShared.accent,
                   foregroundColor: Colors.white,
@@ -130,14 +154,23 @@ class _CalibrationScreenState extends State<CalibrationScreen>
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text(
-                  'Finish Calibration',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: _saving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Save & Apply',
+                        style: TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 12),
@@ -155,6 +188,60 @@ class _CalibrationScreenState extends State<CalibrationScreen>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SliderRow extends StatelessWidget {
+  const _SliderRow({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.display,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int divisions;
+  final String display;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurfaceVariant)),
+            Text(display,
+                style: TextStyle(
+                    fontFamily: 'Space Mono',
+                    fontSize: 13,
+                    color: AppColorsShared.accent)),
+          ],
+        ),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: divisions,
+          activeColor: AppColorsShared.accent,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }
