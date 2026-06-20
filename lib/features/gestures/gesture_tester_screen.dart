@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../main.dart';
 import '../../core/services/gesture_channel.dart';
-import '../../core/services/gesture_recognition_service.dart';
 import '../../core/services/volume_service.dart';
 
 class GestureTesterScreen extends StatefulWidget {
