@@ -5,7 +5,6 @@ import 'core/router/router.dart';
 import 'core/theme/theme.dart';
 
 import 'core/services/gesture_recognition_service.dart';
-import 'core/services/volume_service.dart';
 
 final gestureRecognitionService = GestureRecognitionService();
 

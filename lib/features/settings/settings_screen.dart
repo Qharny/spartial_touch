@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/theme.dart';
 import '../../core/services/gesture_channel.dart'; // Ensure this matches your gesture channel file path
 
 class SettingsScreen extends StatefulWidget {

@@ -56,6 +56,19 @@ class MainActivity : FlutterActivity() {
                         stopGestureService()
                         result.success(null)
                     }
+                    "performAction" -> {
+                        val action = call.arguments as? String
+                        if (action != null) {
+                            if (action in listOf("back", "home", "recents")) {
+                                SpatialTouchAccessibilityService.instance?.performSystemAction(action)
+                            } else {
+                                SpatialTouchAccessibilityService.instance?.dispatchTouchGesture(action)
+                            }
+                            result.success(null)
+                        } else {
+                            result.error("INVALID_ARGUMENT", "Action argument is null", null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

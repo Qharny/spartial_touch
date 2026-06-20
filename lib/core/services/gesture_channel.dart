@@ -8,6 +8,9 @@ class GestureChannel {
   static Future<void> startService() => _channel.invokeMethod('startService');
   static Future<void> stopService()  => _channel.invokeMethod('stopService');
 
+  static Future<void> performAction(String action) => 
+      _channel.invokeMethod('performAction', action);
+
   static Stream<String> get gestureStream =>
       _eventChannel.receiveBroadcastStream().map((e) => e as String);
 
