@@ -29,8 +29,6 @@ extension PerformanceModeX on PerformanceMode {
         PerformanceMode.balanced     => 800,
         PerformanceMode.performance  => 300,
       };
-
-  String get _key => name;
 }
 
 /// Persists and loads [PerformanceMode] from SharedPreferences.

@@ -22,6 +22,20 @@ class GestureChannel {
   static Future<void> setPerformanceMode({required int fps, required int cooldownMs}) =>
       _channel.invokeMethod('setPerformanceMode', {'fps': fps, 'cooldownMs': cooldownMs});
 
+  /// Push calibration parameters to the native gesture engine.
+  static Future<void> setCalibration({
+    required double confidenceThreshold,
+    required double motionThreshold,
+  }) =>
+      _channel.invokeMethod('setCalibration', {
+        'confidenceThreshold': confidenceThreshold,
+        'motionThreshold': motionThreshold,
+      });
+
+  /// Enable or disable haptic feedback on gesture detection.
+  static Future<void> setHapticsEnabled(bool enabled) =>
+      _channel.invokeMethod('setHapticsEnabled', enabled);
+
   static Stream<String> get gestureStream =>
       _eventChannel.receiveBroadcastStream().map((e) => e as String);
 

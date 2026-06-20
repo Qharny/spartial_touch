@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
+import '../../core/services/active_hours_scheduler.dart';
+import '../../core/services/gesture_channel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.onNavigateToTab});
@@ -25,6 +28,21 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     );
+    _loadServiceState();
+  }
+
+  Future<void> _loadServiceState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('gesture_service_enabled') ?? false;
+    if (mounted) {
+      setState(() {
+        _isActive = enabled;
+        if (_isActive) {
+          _pulseCtrl.forward(from: 0);
+          _pulseCtrl.repeat(reverse: true);
+        }
+      });
+    }
   }
 
   @override
@@ -33,9 +51,10 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  void _toggleService() {
+  void _toggleService() async {
+    final nextState = !_isActive;
     setState(() {
-      _isActive = !_isActive;
+      _isActive = nextState;
       if (_isActive) {
         _pulseCtrl.forward(from: 0);
         _pulseCtrl.repeat(reverse: true);
@@ -44,6 +63,16 @@ class _HomeScreenState extends State<HomeScreen>
         _pulseCtrl.value = 0;
       }
     });
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('gesture_service_enabled', nextState);
+
+    if (nextState) {
+      await ActiveHoursScheduler.instance.start_();
+    } else {
+      ActiveHoursScheduler.instance.stop();
+      await GestureChannel.stopService();
+    }
   }
 
   @override
