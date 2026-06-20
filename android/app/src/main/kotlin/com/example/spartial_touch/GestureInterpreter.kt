@@ -22,8 +22,11 @@ object GestureInterpreter {
     private val indexHistory = ArrayDeque<Pair<Float, Float>>()  // for fist pump (Z-axis proxy)
     private const val HISTORY_SIZE = 8
     private var lastGestureTime = 0L
-    private const val COOLDOWN_MS = 800L
+    private var cooldownMs = 800L       // mutable; updated by applyCooldown()
     private const val MIN_CONFIDENCE = 0.75f
+
+    /** Called from MainActivity when the user changes performance mode. */
+    fun applyCooldown(ms: Long) { cooldownMs = ms }
 
     // Hold gesture tracking (Open Palm Hold)
     private var openPalmStartTime = 0L
@@ -31,7 +34,7 @@ object GestureInterpreter {
 
     fun interpret(landmarks: List<NormalizedLandmark>, confidence: Float): String? {
         val now = System.currentTimeMillis()
-        if (now - lastGestureTime < COOLDOWN_MS) return null
+        if (now - lastGestureTime < cooldownMs) return null
         if (confidence < MIN_CONFIDENCE) return null
 
         val wrist = landmarks[WRIST]

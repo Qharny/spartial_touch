@@ -80,6 +80,23 @@ class MainActivity : FlutterActivity() {
                             result.error("INVALID_ARGUMENT", "Expected Map<String,Map<String,String>>", null)
                         }
                     }
+                    "setPerformanceMode" -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val args = call.arguments as? Map<String, Int>
+                        val fps = args?.get("fps") ?: 15
+                        val cooldownMs = args?.get("cooldownMs") ?: 800
+                        GestureInterpreter.applyCooldown(cooldownMs.toLong())
+                        // Persist fps for BackgroundCameraManager to read on next start
+                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                            .edit().putInt("detection_fps", fps).apply()
+                        result.success(null)
+                    }
+                    "setHapticsEnabled" -> {
+                        val enabled = call.arguments as? Boolean ?: true
+                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                            .edit().putBoolean("haptics_enabled", enabled).apply()
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

@@ -16,6 +16,12 @@ class GestureChannel {
   static Future<void> loadProfiles(Map<String, Map<String, String>> profiles) =>
       _channel.invokeMethod('loadProfiles', profiles);
 
+  /// Push performance settings to the native gesture engine.
+  /// [fps] — camera frames per second (5, 15 or 30)
+  /// [cooldownMs] — minimum ms between gesture events (300–2000)
+  static Future<void> setPerformanceMode({required int fps, required int cooldownMs}) =>
+      _channel.invokeMethod('setPerformanceMode', {'fps': fps, 'cooldownMs': cooldownMs});
+
   static Stream<String> get gestureStream =>
       _eventChannel.receiveBroadcastStream().map((e) => e as String);
 
