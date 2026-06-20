@@ -11,6 +11,11 @@ class GestureChannel {
   static Future<void> performAction(String action) => 
       _channel.invokeMethod('performAction', action);
 
+  /// Push all profile mappings to the native ActionDispatcher.
+  /// [profiles] is a map of packageName → {gestureKey → actionId}
+  static Future<void> loadProfiles(Map<String, Map<String, String>> profiles) =>
+      _channel.invokeMethod('loadProfiles', profiles);
+
   static Stream<String> get gestureStream =>
       _eventChannel.receiveBroadcastStream().map((e) => e as String);
 

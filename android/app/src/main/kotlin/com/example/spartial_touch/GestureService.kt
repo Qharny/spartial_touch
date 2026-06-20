@@ -37,12 +37,21 @@ class GestureService : Service() {
     private lateinit var cameraManager: BackgroundCameraManager
     private lateinit var smartWake: SmartWakeManager
     private lateinit var overlay: OverlayManager
+    private lateinit var appMatcher: ForegroundAppMatcher
     val actionDispatcher by lazy { ActionDispatcher(this) }
 
     private var isCameraRunning = false
+    // Package → mappings cache, loaded from Flutter side via setProfile
+    private val profileCache = mutableMapOf<String, Map<String, String>>()
+
+    companion object {
+        var instance: GestureService? = null
+            private set
+    }
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         startForegroundNotification()
 
         // Floating overlay — shows engine status over other apps
@@ -69,6 +78,16 @@ class GestureService : Service() {
             CameraFrameEventBus.sendFrame(bytes)
         }
 
+        // ForegroundAppMatcher — auto-switch profiles when app changes
+        appMatcher = ForegroundAppMatcher(this) { packageName ->
+            val mappings = profileCache[packageName]
+                ?: profileCache["__default__"]
+                ?: emptyMap()
+            actionDispatcher.setMappings(mappings)
+            Log.d("GestureService", "Profile switched → $packageName")
+        }
+        appMatcher.start()
+
         // SmartWake — gates camera on proximity + accelerometer
         smartWake = SmartWakeManager(
             context = this,
@@ -91,11 +110,22 @@ class GestureService : Service() {
     }
 
     override fun onDestroy() {
+        instance = null
+        appMatcher.stop()
         smartWake.stop()
         if (isCameraRunning) cameraManager.stop()
         handTracker.close()
         overlay.dismiss()
         super.onDestroy()
+    }
+
+    /** Called from MainActivity to push profile mappings from Flutter/DB into the service. */
+    fun loadProfileMappings(allProfiles: Map<String, Map<String, String>>) {
+        profileCache.clear()
+        profileCache.putAll(allProfiles)
+        // Immediately apply for the current foreground app
+        val defaultMappings = profileCache["__default__"] ?: emptyMap()
+        actionDispatcher.setMappings(defaultMappings)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
