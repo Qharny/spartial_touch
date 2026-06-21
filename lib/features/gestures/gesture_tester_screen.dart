@@ -28,6 +28,7 @@ class _GestureTesterScreenState extends State<GestureTesterScreen> {
     final status = await Permission.camera.request();
     if (status.isGranted) {
       gestureRecognitionService.startListening();
+      GestureChannel.setSmartWakeEnabled(false); // Bypass SmartWake gating during testing
       _subscription = gestureRecognitionService.gestureStream.listen((event) {
         if (mounted) {
           setState(() {
@@ -54,6 +55,7 @@ class _GestureTesterScreenState extends State<GestureTesterScreen> {
   void dispose() {
     _subscription?.cancel();
     gestureRecognitionService.stopListening();
+    GestureChannel.setSmartWakeEnabled(true); // Re-enable SmartWake sensor gating
     super.dispose();
   }
 

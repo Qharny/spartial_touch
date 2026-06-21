@@ -27,6 +27,7 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
     _successTimer?.cancel();
     if (_isTesting) {
       gestureRecognitionService.stopListening();
+      GestureChannel.setSmartWakeEnabled(true);
     }
     super.dispose();
   }
@@ -77,10 +78,12 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
         _detectedConfidence = 0.0;
         _successMatched = false;
         gestureRecognitionService.startListening();
+        GestureChannel.setSmartWakeEnabled(false); // Bypass SmartWake sensor gating during detail testing
         _gestureSub = gestureRecognitionService.gestureStream.listen(_onGestureEvent);
       } else {
         _gestureSub?.cancel();
         gestureRecognitionService.stopListening();
+        GestureChannel.setSmartWakeEnabled(true); // Restore sensor gating on stop
         _successTimer?.cancel();
       }
     });

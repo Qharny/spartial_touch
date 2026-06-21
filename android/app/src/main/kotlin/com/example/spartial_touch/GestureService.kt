@@ -42,6 +42,7 @@ class GestureService : Service() {
     val actionDispatcher by lazy { ActionDispatcher(this) }
 
     private var isCameraRunning = false
+    private var isSmartWakeEnabled = true
     // Package → mappings cache, loaded from Flutter side via setProfile
     private val profileCache = mutableMapOf<String, Map<String, String>>()
 
@@ -115,7 +116,7 @@ class GestureService : Service() {
                 }
             },
             onSleep = {
-                if (isCameraRunning) {
+                if (isCameraRunning && isSmartWakeEnabled) {
                     isCameraRunning = false
                     cameraManager.stop()
                     overlay.setSleeping()
@@ -123,6 +124,26 @@ class GestureService : Service() {
             }
         )
         smartWake.start()
+    }
+
+    /** Enables or disables smart wake proximity gating dynamically (e.g. for testing screen). */
+    fun setSmartWakeEnabled(enabled: Boolean) {
+        isSmartWakeEnabled = enabled
+        if (!enabled) {
+            // Bypass mode: force-start camera if not running
+            if (!isCameraRunning) {
+                isCameraRunning = true
+                cameraManager.start()
+                overlay.setActive()
+            }
+        } else {
+            // Restore mode: stop camera if sensors say we should be asleep
+            if (!smartWake.isWakeState() && isCameraRunning) {
+                isCameraRunning = false
+                cameraManager.stop()
+                overlay.setSleeping()
+            }
+        }
     }
 
     override fun onDestroy() {

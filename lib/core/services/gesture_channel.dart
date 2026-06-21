@@ -36,6 +36,10 @@ class GestureChannel {
   static Future<void> setHapticsEnabled(bool enabled) =>
       _channel.invokeMethod('setHapticsEnabled', enabled);
 
+  /// Enable or disable SmartWake sensor gating dynamically.
+  static Future<void> setSmartWakeEnabled(bool enabled) =>
+      _channel.invokeMethod('setSmartWakeEnabled', enabled);
+
   static Stream<String> get gestureStream =>
       _eventChannel.receiveBroadcastStream().map((e) => e as String);
 

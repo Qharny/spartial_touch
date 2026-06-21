@@ -36,6 +36,7 @@ class _CalibrationScreenState extends State<CalibrationScreen>
 
     // Start listening to the gesture engine and camera frames
     gestureRecognitionService.startListening();
+    GestureChannel.setSmartWakeEnabled(false); // Bypass SmartWake gating during calibration
     _gestureSub = gestureRecognitionService.gestureStream.listen((event) {
       if (mounted) {
         setState(() {
@@ -78,6 +79,7 @@ class _CalibrationScreenState extends State<CalibrationScreen>
     _pulse.dispose();
     _gestureSub?.cancel();
     gestureRecognitionService.stopListening();
+    GestureChannel.setSmartWakeEnabled(true); // Re-enable SmartWake sensor gating
     super.dispose();
   }
 

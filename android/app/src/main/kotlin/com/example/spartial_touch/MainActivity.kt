@@ -113,6 +113,11 @@ class MainActivity : FlutterActivity() {
                             .edit().putBoolean("haptics_enabled", enabled).apply()
                         result.success(null)
                     }
+                    "setSmartWakeEnabled" -> {
+                        val enabled = call.arguments as? Boolean ?: true
+                        GestureService.instance?.setSmartWakeEnabled(enabled)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

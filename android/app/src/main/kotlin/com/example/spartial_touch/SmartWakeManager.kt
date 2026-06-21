@@ -33,6 +33,8 @@ class SmartWakeManager(
     private var lastAccelMagnitude = 9.8f  // ~gravity at rest
     private var isWake = false
 
+    fun isWakeState(): Boolean = isWake
+
     fun start() {
         proximitySensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
