@@ -40,6 +40,29 @@ class GestureChannel {
   static Future<void> setSmartWakeEnabled(bool enabled) =>
       _channel.invokeMethod('setSmartWakeEnabled', enabled);
 
+  /// Enable or disable a gesture dynamically.
+  static Future<void> setGestureEnabled(String gestureKey, bool enabled) =>
+      _channel.invokeMethod('setGestureEnabled', {
+        'gestureKey': gestureKey,
+        'enabled': enabled,
+      });
+
+  /// Fetch active profile, total gesture count, and efficiency impact from the service.
+  static Future<Map<String, dynamic>> getServiceStats() async {
+    try {
+      final Map<dynamic, dynamic>? res =
+          await _channel.invokeMethod('getServiceStats');
+      if (res != null) {
+        return Map<String, dynamic>.from(res);
+      }
+    } catch (_) {}
+    return {
+      'activeProfile': 'Standby',
+      'totalGestures': 0,
+      'impact': '0.0%',
+    };
+  }
+
   static Stream<String> get gestureStream =>
       _eventChannel.receiveBroadcastStream().map((e) => e as String);
 

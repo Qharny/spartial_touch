@@ -118,6 +118,36 @@ class MainActivity : FlutterActivity() {
                         GestureService.instance?.setSmartWakeEnabled(enabled)
                         result.success(null)
                     }
+                    "getServiceStats" -> {
+                        val service = GestureService.instance
+                        val prefs = getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                        val totalGestures = prefs.getInt("total_gesture_count", 0)
+                        
+                        val activeProfile = if (service != null) {
+                            service.getActiveProfileName()
+                        } else {
+                            "Standby"
+                        }
+
+                        val stats = mapOf(
+                            "activeProfile" to activeProfile,
+                            "totalGestures" to totalGestures,
+                            "impact" to String.format("%.1f%%", Math.min(99.9, totalGestures * 0.08))
+                        )
+                        result.success(stats)
+                    }
+                    "setGestureEnabled" -> {
+                        val args = call.arguments as? Map<String, Any>
+                        val key = args?.get("gestureKey") as? String
+                        val enabled = args?.get("enabled") as? Boolean ?: true
+                        if (key != null) {
+                            getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                                .edit()
+                                .putBoolean("gesture_enabled_$key", enabled)
+                                .apply()
+                        }
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

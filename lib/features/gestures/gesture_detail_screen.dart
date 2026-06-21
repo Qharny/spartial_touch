@@ -41,8 +41,15 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
 
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final title = args?['title'] ?? 'Wave Up';
+    final baseGesture = args?['baseGesture'] ?? '';
+    final isCustom = args?['isCustom'] ?? false;
 
-    if (_isGestureMatch(event.name, title)) {
+    if (_isGestureMatch(
+      detected: event.name,
+      baseGesture: baseGesture,
+      isCustom: isCustom,
+      currentTitle: title,
+    )) {
       _successTimer?.cancel();
       setState(() {
         _successMatched = true;
@@ -57,17 +64,40 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> {
     }
   }
 
-  bool _isGestureMatch(String detected, String currentTitle) {
-    final detLower = detected.toLowerCase();
-    final curLower = currentTitle.toLowerCase();
-    if (detLower == curLower) return true;
+  bool _isGestureMatch({
+    required String detected,
+    required String baseGesture,
+    required bool isCustom,
+    required String currentTitle,
+  }) {
+    final normalizedDetected = detected.toUpperCase().replaceAll(' ', '_');
 
-    // Custom loose matching rules
-    if (curLower == 'palm in' && detLower == 'open palm hold') return true;
-    if (curLower == 'swipe left' && detLower == 'wave left') return true;
-    if (curLower == 'swipe right' && detLower == 'wave right') return true;
+    if (isCustom) {
+      final cleanDetected = normalizedDetected;
+      final cleanBase = baseGesture.toUpperCase();
 
-    return false;
+      if (cleanBase == 'WAVE' && cleanDetected.contains('WAVE')) return true;
+      if (cleanBase == 'SWIPE' && cleanDetected.contains('SWIPE')) return true;
+      if (cleanBase == 'PINCH' && cleanDetected.contains('PINCH')) return true;
+      if (cleanBase == 'CIRCLE' && (cleanDetected.contains('CIRCLE') || cleanDetected.contains('ROTARY'))) return true;
+      if (cleanBase == 'SPREAD' && (cleanDetected.contains('SPREAD') || cleanDetected.contains('PALM'))) return true;
+      return false;
+    } else {
+      if (normalizedDetected == baseGesture.toUpperCase()) {
+        return true;
+      }
+
+      final detLower = detected.toLowerCase();
+      final curLower = currentTitle.toLowerCase();
+      if (detLower == curLower) return true;
+
+      // Custom loose matching rules
+      if (curLower == 'palm in' && detLower == 'open palm hold') return true;
+      if (curLower == 'swipe left' && detLower == 'wave left') return true;
+      if (curLower == 'swipe right' && detLower == 'wave right') return true;
+
+      return false;
+    }
   }
 
   void _toggleTest() {

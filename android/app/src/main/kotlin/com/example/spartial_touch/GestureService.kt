@@ -43,12 +43,25 @@ class GestureService : Service() {
 
     private var isCameraRunning = false
     private var isSmartWakeEnabled = true
-    // Package → mappings cache, loaded from Flutter side via setProfile
     private val profileCache = mutableMapOf<String, Map<String, String>>()
+    private var activeProfilePackage = "__default__"
 
     companion object {
         var instance: GestureService? = null
             private set
+    }
+
+    fun getActiveProfileName(): String {
+        val pkg = activeProfilePackage
+        if (pkg == "__default__") return "Default"
+        return try {
+            val pm = packageManager
+            val info = pm.getApplicationInfo(pkg, 0)
+            pm.getApplicationLabel(info).toString()
+        } catch (e: Exception) {
+            pkg.substringAfterLast('.')
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
     }
 
     override fun onCreate() {
@@ -72,20 +85,28 @@ class GestureService : Service() {
 
         // Hand tracker — calls back with "GESTURE:confidence" payload
         handTracker = HandTracker(this) { gesturePayload ->
-            GestureEventBus.sendEvent(gesturePayload)
-            // Dispatch action based on active profile mapping
-            actionDispatcher.dispatch(gesturePayload)
-            // Haptic feedback if enabled
-            val hapticsEnabled = getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
-                .getBoolean("haptics_enabled", true)
-            if (hapticsEnabled) {
-                HapticService.pulse(this, "medium")
+            val rawKey = gesturePayload.substringBefore(':')
+            val isEnabled = prefs.getBoolean("gesture_enabled_$rawKey", true)
+            
+            if (isEnabled || !isSmartWakeEnabled) {
+                // Increment total gesture count in SharedPreferences
+                val totalGestures = prefs.getInt("total_gesture_count", 0) + 1
+                prefs.edit().putInt("total_gesture_count", totalGestures).apply()
+
+                GestureEventBus.sendEvent(gesturePayload)
+                // Dispatch action based on active profile mapping
+                actionDispatcher.dispatch(gesturePayload)
+                // Haptic feedback if enabled
+                val hapticsEnabled = prefs.getBoolean("haptics_enabled", true)
+                if (hapticsEnabled) {
+                    HapticService.pulse(this, "medium")
+                }
+                // Extract gesture name for overlay flash
+                val gestureName = rawKey
+                    .split('_')
+                    .joinToString(" ") { it.lowercase().replaceFirstChar(Char::uppercaseChar) }
+                overlay.flashGesture(gestureName)
             }
-            // Extract gesture name for overlay flash
-            val gestureName = gesturePayload.substringBefore(':')
-                .split('_')
-                .joinToString(" ") { it.lowercase().replaceFirstChar(Char::uppercaseChar) }
-            overlay.flashGesture(gestureName)
         }
         handTracker.init()
 
@@ -97,6 +118,7 @@ class GestureService : Service() {
 
         // ForegroundAppMatcher — auto-switch profiles when app changes
         appMatcher = ForegroundAppMatcher(this) { packageName ->
+            activeProfilePackage = packageName
             val mappings = profileCache[packageName]
                 ?: profileCache["__default__"]
                 ?: emptyMap()
