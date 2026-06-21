@@ -1,38 +1,47 @@
 package com.example.spartial_touch
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.ImageView
+import android.view.animation.OvershootInterpolator
 import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * OverlayManager draws a draggable floating status bubble using SYSTEM_ALERT_WINDOW.
- * It shows a small indicator when the gesture engine is active, and flashes green
- * when a gesture is successfully recognized.
+ * OverlayManager draws a Dynamic Island overlay centered at the top of the screen
+ * around the camera punch-hole using SYSTEM_ALERT_WINDOW.
+ * It animates smoothly between compact, listening, and gesture detected states.
  */
 class OverlayManager(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val handler = Handler(Looper.getMainLooper())
+    
     private var overlayView: View? = null
     private var statusDot: View? = null
     private var statusLabel: TextView? = null
+    private var innerContainer: LinearLayout? = null
+    private var params: WindowManager.LayoutParams? = null
 
-    private var initialX = 0
-    private var initialY = 0
-    private var initialTouchX = 0f
-    private var initialTouchY = 0f
+    private var currentAnimator: ValueAnimator? = null
+    private var pulseAnimator: ObjectAnimator? = null
+
+    private val resetRunnable = Runnable {
+        setActive()
+    }
 
     fun show() {
         if (!canDrawOverlay()) {
@@ -47,6 +56,10 @@ class OverlayManager(private val context: Context) {
     }
 
     fun dismiss() {
+        handler.removeCallbacks(resetRunnable)
+        stopPulse()
+        currentAnimator?.cancel()
+        
         handler.post {
             overlayView?.let {
                 try {
@@ -57,38 +70,52 @@ class OverlayManager(private val context: Context) {
                 overlayView = null
                 statusDot = null
                 statusLabel = null
+                innerContainer = null
+                params = null
             }
         }
     }
 
     /**
-     * Flash the overlay green to signal a recognized gesture, then revert.
-     * @param gestureName The human-readable gesture name to display briefly.
+     * Expand the dynamic island and display the recognized gesture name.
+     * @param gestureName The name of the detected gesture.
      */
     fun flashGesture(gestureName: String) {
         handler.post {
-            statusDot?.setBackgroundColor(Color.parseColor("#00E676")) // green flash
+            handler.removeCallbacks(resetRunnable)
+            stopPulse()
+            
+            setDotColor("#00E676") // Vibrant green
             statusLabel?.text = gestureName
-            handler.postDelayed({
-                statusDot?.setBackgroundColor(Color.parseColor("#7C4DFF")) // revert to purple
-                statusLabel?.text = "Listening"
-            }, 800)
+
+            animatePillWidth(170, onEnd = {
+                handler.postDelayed(resetRunnable, 1000)
+            })
         }
     }
 
-    /** Set the dot to a sleeping/idle state (grey) */
+    /** Set the island to a sleeping/idle state (compact black pill) */
     fun setSleeping() {
         handler.post {
-            statusDot?.setBackgroundColor(Color.parseColor("#444455"))
+            handler.removeCallbacks(resetRunnable)
+            stopPulse()
+            setDotColor("#444455")
             statusLabel?.text = "Idle"
+            
+            animatePillWidth(36)
         }
     }
 
-    /** Set the dot to an active/watching state (purple) */
+    /** Set the island to an active/listening state (expanded pill with pulsing status dot) */
     fun setActive() {
         handler.post {
-            statusDot?.setBackgroundColor(Color.parseColor("#7C4DFF"))
+            handler.removeCallbacks(resetRunnable)
+            setDotColor("#7C4DFF") // Elegant purple
             statusLabel?.text = "Listening"
+            
+            animatePillWidth(120, onEnd = {
+                startPulse()
+            })
         }
     }
 
@@ -101,25 +128,39 @@ class OverlayManager(private val context: Context) {
     }
 
     private fun buildOverlay() {
+        val density = context.resources.displayMetrics.density
+        
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#CC1A1A2E"))  // semi-transparent dark
-            setPadding(24, 14, 24, 14)
+            gravity = Gravity.CENTER
+            
+            val bgDrawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 16 * density // Fully rounded capsule
+                setColor(Color.BLACK) // Solid black to blend with camera pinhole
+                setStroke((1 * density).toInt(), Color.parseColor("#22FFFFFF")) // Premium thin white outline
+            }
+            background = bgDrawable
         }
 
-        // Status dot
+        // Content container (faded out when collapsed)
+        val inner = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            visibility = View.INVISIBLE
+            alpha = 0f
+        }
+
+        // Circular status dot
         val dot = View(context).apply {
-            setBackgroundColor(Color.parseColor("#7C4DFF"))
-            val dp8 = (8 * context.resources.displayMetrics.density).toInt()
+            val dp8 = (8 * density).toInt()
             layoutParams = LinearLayout.LayoutParams(dp8, dp8).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                marginEnd = (10 * context.resources.displayMetrics.density).toInt()
+                marginEnd = (8 * density).toInt()
             }
-        }
-        // Make dot circular via post
-        dot.post {
-            dot.background = context.getDrawable(android.R.drawable.btn_radio)?.apply {
-                setTint(Color.parseColor("#7C4DFF"))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#7C4DFF"))
             }
         }
 
@@ -130,10 +171,13 @@ class OverlayManager(private val context: Context) {
             typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
 
-        container.addView(dot)
-        container.addView(label)
+        inner.addView(dot)
+        inner.addView(label)
+        container.addView(inner)
+
         statusDot = dot
         statusLabel = label
+        innerContainer = inner
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -141,39 +185,106 @@ class OverlayManager(private val context: Context) {
             @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+        val initialWidth = (36 * density).toInt()
+        val fixedHeight = (32 * density).toInt()
+
+        val lp = WindowManager.LayoutParams(
+            initialWidth,
+            fixedHeight,
             overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = 24
-            y = 160
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            x = 0
+            y = (8 * density).toInt() // Position overlay precisely around punch-hole camera
         }
 
-        // Drag support
-        container.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
+        params = lp
+        windowManager.addView(container, lp)
+        overlayView = container
+    }
+
+    private fun animatePillWidth(targetWidthDp: Int, onStart: () -> Unit = {}, onEnd: () -> Unit = {}) {
+        val lp = params ?: return
+        val view = overlayView ?: return
+        
+        currentAnimator?.cancel()
+
+        val density = context.resources.displayMetrics.density
+        val startWidth = lp.width
+        val endWidth = (targetWidthDp * density).toInt()
+
+        if (view.isAttachedToWindow == false) {
+            lp.width = endWidth
+            onStart()
+            if (targetWidthDp > 40) {
+                innerContainer?.visibility = View.VISIBLE
+                innerContainer?.alpha = 1f
+            } else {
+                innerContainer?.visibility = View.INVISIBLE
+                innerContainer?.alpha = 0f
+            }
+            onEnd()
+            return
+        }
+
+        // Fade out content early if we are collapsing to prevent text wrap/squish
+        if (targetWidthDp <= 40) {
+            innerContainer?.animate()?.alpha(0f)?.setDuration(80)?.start()
+        }
+
+        currentAnimator = ValueAnimator.ofInt(startWidth, endWidth).apply {
+            duration = 280
+            interpolator = OvershootInterpolator(0.8f) // Bouncy spring effect
+            addUpdateListener { animation ->
+                lp.width = animation.animatedValue as Int
+                if (view.isAttachedToWindow) {
+                    windowManager.updateViewLayout(view, lp)
                 }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (initialTouchX - event.rawX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    windowManager.updateViewLayout(v, params)
-                    true
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationStart(animation: Animator) {
+                    onStart()
                 }
-                else -> false
+                override fun onAnimationEnd(animation: Animator) {
+                    if (targetWidthDp > 40) {
+                        innerContainer?.visibility = View.VISIBLE
+                        innerContainer?.animate()?.alpha(1f)?.setDuration(120)?.start()
+                    } else {
+                        innerContainer?.visibility = View.INVISIBLE
+                    }
+                    onEnd()
+                }
+            })
+        }
+        currentAnimator?.start()
+    }
+
+    private fun setDotColor(hexColor: String) {
+        statusDot?.background?.let {
+            if (it is GradientDrawable) {
+                it.setColor(Color.parseColor(hexColor))
             }
         }
+    }
 
-        windowManager.addView(container, params)
-        overlayView = container
+    private fun startPulse() {
+        statusDot?.let { dot ->
+            pulseAnimator?.cancel()
+            pulseAnimator = ObjectAnimator.ofFloat(dot, "alpha", 0.3f, 1.0f).apply {
+                duration = 800
+                repeatMode = ValueAnimator.REVERSE
+                repeatCount = ValueAnimator.INFINITE
+                start()
+            }
+        }
+    }
+
+    private fun stopPulse() {
+        pulseAnimator?.cancel()
+        statusDot?.alpha = 1.0f
     }
 }
