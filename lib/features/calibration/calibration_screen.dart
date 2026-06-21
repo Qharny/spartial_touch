@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../../main.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/calibration_service.dart';
 import '../../core/services/gesture_channel.dart';
@@ -18,6 +21,10 @@ class _CalibrationScreenState extends State<CalibrationScreen>
   double _motionThreshold = 0.12;
   bool _saving = false;
 
+  String _detectedGesture = 'Waiting...';
+  double _detectedConfidence = 0.0;
+  StreamSubscription? _gestureSub;
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +33,17 @@ class _CalibrationScreenState extends State<CalibrationScreen>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
     _loadSaved();
+
+    // Start listening to the gesture engine and camera frames
+    gestureRecognitionService.startListening();
+    _gestureSub = gestureRecognitionService.gestureStream.listen((event) {
+      if (mounted) {
+        setState(() {
+          _detectedGesture = event.name;
+          _detectedConfidence = event.confidence;
+        });
+      }
+    });
   }
 
   Future<void> _loadSaved() async {
@@ -58,6 +76,8 @@ class _CalibrationScreenState extends State<CalibrationScreen>
   @override
   void dispose() {
     _pulse.dispose();
+    _gestureSub?.cancel();
+    gestureRecognitionService.stopListening();
     super.dispose();
   }
 
@@ -88,33 +108,73 @@ class _CalibrationScreenState extends State<CalibrationScreen>
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
         child: Column(
           children: [
-            // ── Animated target ──────────────────────────────────────────────
+            // ── Live Camera Feed ──────────────────────────────────────────────
             Expanded(
               child: Center(
-                child: AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (context, child) {
-                    final t = _pulse.value;
-                    return Container(
-                      width: 200 + 20 * t,
-                      height: 200 + 20 * t,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColorsShared.accent.withValues(alpha: 0.08),
-                        border: Border.all(
-                          color: AppColorsShared.accent.withValues(alpha: 0.5 + 0.5 * t),
-                          width: 2,
-                        ),
-                      ),
-                      child: child,
-                    );
-                  },
-                  child: const Center(
-                    child: Icon(Icons.pan_tool_rounded, size: 80),
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColorsShared.accent,
+                      width: 3,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: StreamBuilder<Uint8List>(
+                      stream: GestureChannel.cameraFrameStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return RotatedBox(
+                            quarterTurns: 1, // Rotate 90 degrees for portrait
+                            child: Transform.scale(
+                              scaleX: -1, // Mirror front camera
+                              child: Image.memory(
+                                snapshot.data!,
+                                fit: BoxFit.cover,
+                                gaplessPlayback: true,
+                              ),
+                            ),
+                          );
+                        }
+                        return Center(
+                          child: Icon(
+                            Icons.videocam_off_rounded,
+                            size: 64,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            Text(
+              _detectedGesture,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
+            if (_detectedGesture != 'Waiting...' && _detectedGesture != 'None') ...[
+              const SizedBox(height: 4),
+              Text(
+                '${(_detectedConfidence * 100).toInt()}% CONFIDENCE',
+                style: TextStyle(
+                  fontFamily: 'Space Mono',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColorsShared.accent,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
 
             // ── Confidence slider ─────────────────────────────────────────────
             _SliderRow(
