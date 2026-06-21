@@ -186,7 +186,13 @@ class _CalibrationScreenState extends State<CalibrationScreen>
               max: 0.95,
               divisions: 9,
               display: '${(_confidenceThreshold * 100).round()}%',
-              onChanged: (v) => setState(() => _confidenceThreshold = v),
+              onChanged: (v) {
+                setState(() => _confidenceThreshold = v);
+                GestureChannel.setCalibration(
+                  confidenceThreshold: _confidenceThreshold,
+                  motionThreshold: _motionThreshold,
+                );
+              },
             ),
             const SizedBox(height: 8),
 
@@ -198,7 +204,13 @@ class _CalibrationScreenState extends State<CalibrationScreen>
               max: 0.25,
               divisions: 19,
               display: _motionThreshold.toStringAsFixed(2),
-              onChanged: (v) => setState(() => _motionThreshold = v),
+              onChanged: (v) {
+                setState(() => _motionThreshold = v);
+                GestureChannel.setCalibration(
+                  confidenceThreshold: _confidenceThreshold,
+                  motionThreshold: _motionThreshold,
+                );
+              },
             ),
             const SizedBox(height: 28),
 

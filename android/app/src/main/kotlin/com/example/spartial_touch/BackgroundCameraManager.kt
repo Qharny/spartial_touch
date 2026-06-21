@@ -36,6 +36,9 @@ class BackgroundCameraManager(
         get() = lifecycleRegistry
 
     fun start() {
+        if (cameraExecutor.isShutdown) {
+            cameraExecutor = Executors.newSingleThreadExecutor()
+        }
         lifecycleRegistry.currentState = Lifecycle.State.STARTED
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
 
@@ -48,9 +51,10 @@ class BackgroundCameraManager(
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
                         val (bitmap, bytes) = imageProxy.image?.toBitmapAndBytes() ?: Pair(null, null)
-                        val timestamp = imageProxy.imageInfo.timestamp
+                        val timestampNs = imageProxy.imageInfo.timestamp
+                        val timestampMs = timestampNs / 1_000_000
                         if (bitmap != null && bytes != null) {
-                            onFrame(bitmap, bytes, timestamp)
+                            onFrame(bitmap, bytes, timestampMs)
                         }
                         imageProxy.close()
                     }

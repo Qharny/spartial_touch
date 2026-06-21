@@ -7,6 +7,7 @@ import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarker
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
+import android.util.Log
 
 class HandTracker(
     private val context: Context,
@@ -15,9 +16,24 @@ class HandTracker(
     private var handLandmarker: HandLandmarker? = null
 
     fun init() {
+        try {
+            initLandmarker(com.google.mediapipe.tasks.core.Delegate.GPU)
+            Log.d("HandTracker", "HandLandmarker initialized successfully with GPU delegate.")
+        } catch (e: Exception) {
+            Log.w("HandTracker", "Failed to initialize HandLandmarker with GPU delegate, falling back to CPU", e)
+            try {
+                initLandmarker(com.google.mediapipe.tasks.core.Delegate.CPU)
+                Log.d("HandTracker", "HandLandmarker initialized successfully with CPU delegate.")
+            } catch (e2: Exception) {
+                Log.e("HandTracker", "Failed to initialize HandLandmarker with CPU delegate", e2)
+            }
+        }
+    }
+
+    private fun initLandmarker(delegate: com.google.mediapipe.tasks.core.Delegate) {
         val baseOptions = BaseOptions.builder()
             .setModelAssetPath("hand_landmarker.task")
-            .setDelegate(com.google.mediapipe.tasks.core.Delegate.GPU) // falls back to CPU automatically
+            .setDelegate(delegate)
             .build()
 
         val options = HandLandmarker.HandLandmarkerOptions.builder()
@@ -56,9 +72,12 @@ class HandTracker(
             0f
         }
 
+        Log.d("HandTracker", "Hand detected! Confidence: $confidence")
+
         val gesture = GestureInterpreter.interpret(landmarks, confidence)
 
         if (gesture != null) {
+            Log.d("HandTracker", "Gesture Interpreted: $gesture")
             onGestureDetected(gesture)
         }
     }
