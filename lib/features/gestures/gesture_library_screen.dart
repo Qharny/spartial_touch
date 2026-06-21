@@ -130,24 +130,42 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
               title: gesture['title'] ?? '',
               icon: _getIconFromString(gesture['icon'] ?? ''),
               isActive: gesture['isActive'] ?? false,
-              onTap: () => Navigator.of(context).pushNamed(AppRoutes.gestureDetail),
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.gestureDetail,
+                arguments: {
+                  'title': gesture['title'] ?? '',
+                  'icon': gesture['icon'] ?? '',
+                  'isActive': gesture['isActive'] ?? false,
+                  'isCustom': false,
+                },
+              ),
               onDelete: () => _deleteDemoGesture(index),
             );
           }),
           ...List.generate(_customGestures.length, (index) {
             final gesture = _customGestures[index];
             IconData iconData = Icons.gesture;
-            if (gesture['baseGesture'] == 'Wave') iconData = Icons.waves;
-            if (gesture['baseGesture'] == 'Swipe') iconData = Icons.swipe;
-            if (gesture['baseGesture'] == 'Pinch') iconData = Icons.pinch;
-            if (gesture['baseGesture'] == 'Circle') iconData = Icons.rotate_right;
-            if (gesture['baseGesture'] == 'Spread') iconData = Icons.open_in_full;
+            String iconName = 'gesture';
+            if (gesture['baseGesture'] == 'Wave') { iconData = Icons.waves; iconName = 'waves'; }
+            if (gesture['baseGesture'] == 'Swipe') { iconData = Icons.swipe; iconName = 'swipe'; }
+            if (gesture['baseGesture'] == 'Pinch') { iconData = Icons.pinch; iconName = 'pinch_rounded'; }
+            if (gesture['baseGesture'] == 'Circle') { iconData = Icons.rotate_right; iconName = 'rotate_right_rounded'; }
+            if (gesture['baseGesture'] == 'Spread') { iconData = Icons.open_in_full; iconName = 'open_in_full_rounded'; }
 
             return GestureCard(
               title: gesture['name'] ?? 'Custom',
               icon: iconData,
               isActive: true,
-              onTap: () => Navigator.of(context).pushNamed(AppRoutes.gestureDetail),
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.gestureDetail,
+                arguments: {
+                  'title': gesture['name'] ?? 'Custom',
+                  'icon': iconName,
+                  'isActive': true,
+                  'isCustom': true,
+                  'baseGesture': gesture['baseGesture'] ?? '',
+                },
+              ),
               onDelete: () => _deleteCustomGesture(index),
             );
           }),
