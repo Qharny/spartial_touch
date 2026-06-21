@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/router/router.dart';
@@ -21,6 +22,11 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isActive = false;
   late AnimationController _pulseCtrl;
 
+  String _profileName = 'Standby';
+  int _gestureCount = 0;
+  String _impact = '0.0%';
+  Timer? _statsTimer;
+
   @override
   void initState() {
     super.initState();
@@ -40,14 +46,40 @@ class _HomeScreenState extends State<HomeScreen>
         if (_isActive) {
           _pulseCtrl.forward(from: 0);
           _pulseCtrl.repeat(reverse: true);
+          _startStatsPolling();
+        } else {
+          _updateStats(); // Initial query to load historic stats
         }
       });
     }
   }
 
+  Future<void> _updateStats() async {
+    final stats = await GestureChannel.getServiceStats();
+    if (mounted) {
+      setState(() {
+        _profileName = _isActive ? (stats['activeProfile'] ?? 'Default') : 'Standby';
+        _gestureCount = stats['totalGestures'] ?? 0;
+        _impact = stats['impact'] ?? '0.0%';
+      });
+    }
+  }
+
+  void _startStatsPolling() {
+    _statsTimer?.cancel();
+    _statsTimer = Timer.periodic(const Duration(seconds: 1), (_) => _updateStats());
+    _updateStats();
+  }
+
+  void _stopStatsPolling() {
+    _statsTimer?.cancel();
+    _statsTimer = null;
+  }
+
   @override
   void dispose() {
     _pulseCtrl.dispose();
+    _stopStatsPolling();
     super.dispose();
   }
 
@@ -58,9 +90,12 @@ class _HomeScreenState extends State<HomeScreen>
       if (_isActive) {
         _pulseCtrl.forward(from: 0);
         _pulseCtrl.repeat(reverse: true);
+        _startStatsPolling();
       } else {
         _pulseCtrl.stop();
         _pulseCtrl.value = 0;
+        _stopStatsPolling();
+        _profileName = 'Standby';
       }
     });
 
@@ -72,6 +107,7 @@ class _HomeScreenState extends State<HomeScreen>
     } else {
       ActiveHoursScheduler.instance.stop();
       await GestureChannel.stopService();
+      _updateStats(); // Fetch final counter state
     }
   }
 
@@ -178,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Expanded(
                   child: _StatTile(
                     label: 'PROFILE',
-                    value: 'Default',
+                    value: _profileName,
                     isActive: _isActive,
                   ),
                 ),
@@ -186,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Expanded(
                   child: _StatTile(
                     label: 'GESTURES',
-                    value: _isActive ? '142' : '0',
+                    value: _gestureCount.toString(),
                     isActive: false,
                   ),
                 ),
@@ -194,7 +230,7 @@ class _HomeScreenState extends State<HomeScreen>
                 Expanded(
                   child: _StatTile(
                     label: 'IMPACT',
-                    value: _isActive ? '1.2%' : '0.0%',
+                    value: _impact,
                     isActive: false,
                   ),
                 ),
