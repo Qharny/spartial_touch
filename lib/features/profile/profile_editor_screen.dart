@@ -3,19 +3,48 @@ import '../../core/theme/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
+import '../../core/models/profile.dart';
+import '../../core/models/profile_database.dart';
 
-const List<String> _availableActions = [
-  'Play/Pause',
-  'Next Track',
-  'Previous Track',
-  'Volume Up',
-  'Volume Down',
-  'Scroll Up',
-  'Scroll Down',
-  'Like / Double Tap',
-  'Go Home',
-  'None',
+/// The 13 gestures GestureInterpreter.kt can actually emit. Keys must match
+/// exactly — they're sent to the native ActionDispatcher as-is.
+const List<(String, String)> _availableGestures = [
+  ('WAVE_UP', 'Wave Up'),
+  ('WAVE_DOWN', 'Wave Down'),
+  ('WAVE_LEFT', 'Wave Left'),
+  ('WAVE_RIGHT', 'Wave Right'),
+  ('OPEN_PALM_HOLD', 'Open Palm Hold'),
+  ('THUMBS_UP', 'Thumbs Up'),
+  ('THUMBS_DOWN', 'Thumbs Down'),
+  ('INDEX_POINT_UP', 'Index Point Up'),
+  ('PINCH', 'Pinch'),
+  ('TWO_FINGER_SWIPE_LEFT', 'Two-Finger Swipe Left'),
+  ('TWO_FINGER_SWIPE_RIGHT', 'Two-Finger Swipe Right'),
+  ('FIST_PUMP', 'Fist Pump'),
+  ('ROCK_SIGN', 'Rock Sign'),
 ];
+
+/// The actionIds ActionDispatcher.kt actually understands. Must match exactly.
+const List<(String, String)> _availableActions = [
+  ('scroll_up', 'Scroll Up'),
+  ('scroll_down', 'Scroll Down'),
+  ('swipe_left', 'Swipe Left'),
+  ('swipe_right', 'Swipe Right'),
+  ('tap', 'Tap'),
+  ('back', 'Go Back'),
+  ('home', 'Go Home'),
+  ('recents', 'Recent Apps'),
+  ('media_play_pause', 'Play / Pause'),
+  ('media_next', 'Next Track'),
+  ('media_previous', 'Previous Track'),
+  ('volume_up', 'Volume Up'),
+  ('volume_down', 'Volume Down'),
+  ('screenshot', 'Screenshot'),
+];
+
+String _actionLabel(String actionId) => _availableActions
+    .firstWhere((a) => a.$1 == actionId, orElse: () => (actionId, actionId))
+    .$2;
 
 class ProfileEditorScreen extends StatefulWidget {
   const ProfileEditorScreen({super.key});
@@ -28,13 +57,12 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   List<AppInfo> _installedApps = [];
   List<AppInfo> _activeApps = [];
   bool _loadingApps = true;
+  bool _saving = false;
 
-  final Map<String, String> _gestureMappings = {
-    'Wave Up': 'Next Track',
-    'Wave Down': 'Previous Track',
-    'Double Tap Air': 'Play/Pause',
-    'Circular Motion': 'Volume Up',
-    'Pinch': 'None',
+  /// gestureKey -> actionId, or null if that gesture is unmapped for this
+  /// preset. Edits the shared mapping applied to every app in [_activeApps].
+  final Map<String, String?> _gestureMappings = {
+    for (final g in _availableGestures) g.$1: null,
   };
 
   @override
@@ -49,10 +77,10 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
       List<AppInfo> apps = await InstalledApps.getInstalledApps(excludeSystemApps: true, withIcon: true);
       // Sort apps alphabetically
       apps.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      
+
       final prefs = await SharedPreferences.getInstance();
       final savedPackages = prefs.getStringList('active_apps_packages') ?? [];
-      
+
       if (mounted) {
         setState(() {
           _installedApps = apps;
@@ -64,11 +92,29 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
           _loadingApps = false;
         });
       }
+      await _loadMappingsForActiveApps();
     } catch (e) {
       if (mounted) {
         setState(() => _loadingApps = false);
       }
     }
+  }
+
+  /// Loads the current mapping preset to edit: the first active app's saved
+  /// profile if it has one, else the Default profile's, else leaves every
+  /// gesture unmapped.
+  Future<void> _loadMappingsForActiveApps() async {
+    if (_activeApps.isEmpty) return;
+    final profile = await ProfileDatabase.instance.getProfileByPackage(_activeApps.first.packageName) ??
+        await ProfileDatabase.instance.getProfileByPackage('__default__');
+    if (profile == null || !mounted) return;
+    setState(() {
+      for (final mapping in profile.mappings) {
+        if (mapping.enabled && _gestureMappings.containsKey(mapping.gestureKey)) {
+          _gestureMappings[mapping.gestureKey] = mapping.actionId;
+        }
+      }
+    });
   }
 
   void _showAppSelector() {
@@ -149,22 +195,24 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
         return ListView.builder(
           shrinkWrap: true,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          itemCount: _availableActions.length,
+          itemCount: _availableActions.length + 1,
           itemBuilder: (ctx, index) {
-            final action = _availableActions[index];
+            // Index 0 is the "None" (unmapped) option; the rest are real actions.
+            final actionId = index == 0 ? null : _availableActions[index - 1].$1;
+            final label = index == 0 ? 'None' : _availableActions[index - 1].$2;
             return ListTile(
               title: Text(
-                action,
+                label,
                 style: const TextStyle(
                   fontFamily: 'Inter',
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              trailing: _gestureMappings[gestureKey] == action
+              trailing: _gestureMappings[gestureKey] == actionId
                   ? Icon(Icons.check_circle_rounded, color: AppColorsShared.accent)
                   : null,
               onTap: () {
-                setState(() => _gestureMappings[gestureKey] = action);
+                setState(() => _gestureMappings[gestureKey] = actionId);
                 Navigator.of(ctx).pop();
               },
             );
@@ -175,23 +223,37 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_activeApps.isEmpty) return;
-    
+    if (_activeApps.isEmpty || _saving) return;
+    setState(() => _saving = true);
+
     final prefs = await SharedPreferences.getInstance();
-    
-    // Save active apps list
+
+    // Save active apps list (which apps this shared preset applies to)
     final activePackages = _activeApps.map((a) => a.packageName).toList();
     final activeNames = _activeApps.map((a) => a.name).toList();
     await prefs.setStringList('active_apps_packages', activePackages);
     await prefs.setStringList('active_apps_names', activeNames);
-    
-    // Save settings per package name
-    for (var app in _activeApps) {
-      final pkg = app.packageName;
-      for (var entry in _gestureMappings.entries) {
-        await prefs.setString('gesture_${pkg}_${entry.key}', entry.value);
-      }
+
+    final mappings = _gestureMappings.entries
+        .where((e) => e.value != null)
+        .map((e) => GestureMapping(
+              gestureKey: e.key,
+              actionId: e.value!,
+              actionLabel: _actionLabel(e.value!),
+            ))
+        .toList();
+
+    // Persist one AppProfile per selected app, then push the full set to the
+    // native ActionDispatcher — GestureService.loadProfileMappings replaces
+    // its whole cache each call, so a partial push isn't meaningful.
+    for (final app in _activeApps) {
+      await ProfileDatabase.instance.insertProfile(AppProfile(
+        packageName: app.packageName,
+        displayName: app.name,
+        mappings: mappings,
+      ));
     }
+    await ProfileDatabase.instance.syncToNative();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -240,7 +302,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           if (_loadingApps)
             const Center(child: CircularProgressIndicator())
           else ...[
@@ -278,7 +340,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                   }).toList(),
                 ),
               ),
-            
+
             const SizedBox(height: 12),
             GestureDetector(
               onTap: _showAppSelector,
@@ -323,40 +385,17 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
           ),
           const SizedBox(height: 12),
 
-          _GestureRow(
-            title: 'Wave Up',
-            subtitle: 'Vertical motion sensor',
-            action: _gestureMappings['Wave Up']!,
-            onTap: () => _showActionSelector('Wave Up'),
-          ),
-          const Divider(height: 1),
-          _GestureRow(
-            title: 'Wave Down',
-            subtitle: 'Vertical motion sensor',
-            action: _gestureMappings['Wave Down']!,
-            onTap: () => _showActionSelector('Wave Down'),
-          ),
-          const Divider(height: 1),
-          _GestureRow(
-            title: 'Double Tap Air',
-            subtitle: 'Depth recognition pulse',
-            action: _gestureMappings['Double Tap Air']!,
-            onTap: () => _showActionSelector('Double Tap Air'),
-          ),
-          const Divider(height: 1),
-          _GestureRow(
-            title: 'Circular Motion',
-            subtitle: 'Rotary spatial input',
-            action: _gestureMappings['Circular Motion']!,
-            onTap: () => _showActionSelector('Circular Motion'),
-          ),
-          const Divider(height: 1),
-          _GestureRow(
-            title: 'Pinch',
-            subtitle: 'Finger grip detection',
-            action: _gestureMappings['Pinch']!,
-            onTap: () => _showActionSelector('Pinch'),
-          ),
+          for (int i = 0; i < _availableGestures.length; i++) ...[
+            _GestureRow(
+              title: _availableGestures[i].$2,
+              action: switch (_gestureMappings[_availableGestures[i].$1]) {
+                null => 'None',
+                final id => _actionLabel(id),
+              },
+              onTap: () => _showActionSelector(_availableGestures[i].$1),
+            ),
+            if (i < _availableGestures.length - 1) const Divider(height: 1),
+          ],
 
           const SizedBox(height: 48),
 
@@ -365,7 +404,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: _saveProfile,
+              onPressed: _saving ? null : _saveProfile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColorsShared.accent,
                 foregroundColor: Colors.white,
@@ -373,14 +412,20 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                'Save Profile',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text(
+                      'Save Profile',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -392,13 +437,11 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
 class _GestureRow extends StatelessWidget {
   const _GestureRow({
     required this.title,
-    required this.subtitle,
     required this.action,
     required this.onTap,
   });
 
   final String title;
-  final String subtitle;
   final String action;
   final VoidCallback onTap;
 
@@ -414,28 +457,14 @@ class _GestureRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
               ),
             ),
             Container(

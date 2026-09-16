@@ -18,8 +18,10 @@ import android.util.Log
  */
 class ActionDispatcher(private val context: Context) {
 
-    // Current mapping: gesture key → action id, loaded from active profile
-    private val mappings = mutableMapOf<String, String>()
+    // Current mapping: gesture key → action id, loaded from active profile.
+    // setMappings() runs on the main thread (profile switches); dispatch() is read from
+    // HandTracker's MediaPipe result-listener thread — needs a thread-safe map.
+    private val mappings = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /** Update the active mapping (called from GestureService when profile changes) */
     fun setMappings(newMappings: Map<String, String>) {

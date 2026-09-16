@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/active_hours_scheduler.dart';
 import '../../core/services/gesture_channel.dart';
+import '../../core/models/profile_database.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.onNavigateToTab});
@@ -85,6 +88,15 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _toggleService() async {
     final nextState = !_isActive;
+
+    if (nextState) {
+      final cameraStatus = await Permission.camera.status;
+      if (!cameraStatus.isGranted) {
+        _showPermissionNeededSnackBar();
+        return;
+      }
+    }
+
     setState(() {
       _isActive = nextState;
       if (_isActive) {
@@ -103,12 +115,44 @@ class _HomeScreenState extends State<HomeScreen>
     await prefs.setBool('gesture_service_enabled', nextState);
 
     if (nextState) {
-      await ActiveHoursScheduler.instance.start_();
+      try {
+        await ActiveHoursScheduler.instance.start_();
+        // The service starts with an empty native mapping cache until this is
+        // pushed — without it, gestures fire but nothing is dispatched.
+        await ProfileDatabase.instance.syncToNative();
+      } on PlatformException catch (_) {
+        // Native side refused to start (e.g. permission revoked after the check above) —
+        // undo the optimistic UI update rather than leaving a stale "active" toggle.
+        await prefs.setBool('gesture_service_enabled', false);
+        if (mounted) {
+          setState(() {
+            _isActive = false;
+            _pulseCtrl.stop();
+            _pulseCtrl.value = 0;
+            _stopStatsPolling();
+            _profileName = 'Standby';
+          });
+          _showPermissionNeededSnackBar();
+        }
+      }
     } else {
       ActiveHoursScheduler.instance.stop();
       await GestureChannel.stopService();
       _updateStats(); // Fetch final counter state
     }
+  }
+
+  void _showPermissionNeededSnackBar() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Camera permission is required to start SpatialTouch.'),
+        action: SnackBarAction(
+          label: 'Settings',
+          onPressed: openAppSettings,
+        ),
+      ),
+    );
   }
 
   @override

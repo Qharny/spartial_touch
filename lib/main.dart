@@ -7,6 +7,7 @@ import 'core/theme/theme.dart';
 
 import 'core/services/gesture_recognition_service.dart';
 import 'core/services/active_hours_scheduler.dart';
+import 'core/models/profile_database.dart';
 
 final gestureRecognitionService = GestureRecognitionService();
 
@@ -30,7 +31,16 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final serviceEnabled = prefs.getBool('gesture_service_enabled') ?? false;
   if (serviceEnabled) {
-    await ActiveHoursScheduler.instance.start_();
+    try {
+      await ActiveHoursScheduler.instance.start_();
+      // The native service starts with an empty mapping cache until this is
+      // pushed — without it, a service that was already running before the
+      // Flutter side even added a profile has nothing to dispatch gestures to.
+      await ProfileDatabase.instance.syncToNative();
+    } catch (_) {
+      // Most likely CAMERA permission was revoked while the app was closed;
+      // there's no UI here to report to, home_screen's toggle will surface it.
+    }
   }
 
   runApp(const SpartialTouchApp());

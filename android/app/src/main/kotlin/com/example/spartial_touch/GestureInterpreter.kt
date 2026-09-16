@@ -22,9 +22,12 @@ object GestureInterpreter {
     private val indexHistory = ArrayDeque<Pair<Float, Float>>()  // for fist pump (Z-axis proxy)
     private const val HISTORY_SIZE = 8
     private var lastGestureTime = 0L
-    private var cooldownMs = 800L         // mutable; updated by applyCooldown()
-    private var minConfidence = 0.75f     // mutable; updated by applyCalibration()
-    private var motionThreshold = 0.12f   // mutable; updated by applyCalibration()
+    // @Volatile: written from the main thread (applyCooldown/applyCalibration, driven by the
+    // MethodChannel handler) but read from MediaPipe's result-listener thread on every frame —
+    // without it a setting change isn't guaranteed to become visible to that thread promptly.
+    @Volatile private var cooldownMs = 800L         // mutable; updated by applyCooldown()
+    @Volatile private var minConfidence = 0.75f     // mutable; updated by applyCalibration()
+    @Volatile private var motionThreshold = 0.12f   // mutable; updated by applyCalibration()
 
     /** Called from MainActivity when the user changes performance mode. */
     fun applyCooldown(ms: Long) { cooldownMs = ms }
@@ -40,9 +43,17 @@ object GestureInterpreter {
     private const val HOLD_DURATION_MS = 1200L
 
     fun interpret(landmarks: List<NormalizedLandmark>, confidence: Float): String? {
-        val now = System.currentTimeMillis()
-        if (now - lastGestureTime < cooldownMs) return null
         if (confidence < minConfidence) return null
+
+        val now = System.currentTimeMillis()
+        // Gates FIRING only (below) — history keeps updating every frame regardless, so a
+        // wave right after cooldown ends is measured over the true recent window, not one
+        // that spans the whole cooldown gap. Previously the cooldown check short-circuited
+        // before the history update, so the deque stayed frozen through the entire cooldown;
+        // the first post-cooldown frame then computed its delta against a frame from up to
+        // 2000ms earlier, which easily exceeds motionThreshold from ordinary hand drift alone
+        // and fired a spurious wave immediately after almost every real gesture.
+        val inCooldown = now - lastGestureTime < cooldownMs
 
         val wrist = landmarks[WRIST]
 
@@ -60,13 +71,15 @@ object GestureInterpreter {
         // Open Palm Hold: all 4 fingers extended + held for HOLD_DURATION_MS
         if (isOpenPalm(landmarks)) {
             if (openPalmStartTime == 0L) openPalmStartTime = now
-            if (now - openPalmStartTime >= HOLD_DURATION_MS) {
+            if (!inCooldown && now - openPalmStartTime >= HOLD_DURATION_MS) {
                 openPalmStartTime = 0L
                 return fire("OPEN_PALM_HOLD", confidence)
             }
         } else {
             openPalmStartTime = 0L
         }
+
+        if (inCooldown) return null
 
         // Need full history for motion gestures
         if (wristHistory.size < HISTORY_SIZE) return null
@@ -135,7 +148,9 @@ object GestureInterpreter {
     private fun isThumbsDown(lm: List<NormalizedLandmark>): Boolean =
         lm[THUMB_TIP].y() > lm[WRIST].y() + 0.1f &&
         lm[INDEX_TIP].y() > lm[INDEX_MCP].y()      &&
-        lm[MIDDLE_TIP].y() > lm[MIDDLE_MCP].y()
+        lm[MIDDLE_TIP].y() > lm[MIDDLE_MCP].y()    &&
+        lm[RING_TIP].y()   > lm[RING_MCP].y()      &&
+        lm[PINKY_TIP].y()  > lm[PINKY_MCP].y()
 
     private fun isIndexPointUp(lm: List<NormalizedLandmark>): Boolean =
         lm[INDEX_TIP].y() < lm[INDEX_MCP].y() - 0.15f &&

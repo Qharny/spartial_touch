@@ -203,8 +203,15 @@ class OverlayManager(private val context: Context) {
         }
 
         params = lp
-        windowManager.addView(container, lp)
-        overlayView = container
+        try {
+            windowManager.addView(container, lp)
+            overlayView = container
+        } catch (e: Exception) {
+            // e.g. BadTokenException, or SYSTEM_ALERT_WINDOW revoked between show()'s
+            // permission check and this call — leave overlayView null so a later show()
+            // can retry, instead of crashing (dismiss() already guards its own removeView).
+            Log.e("OverlayManager", "Failed to add overlay view", e)
+        }
     }
 
     private fun animatePillWidth(targetWidthDp: Int, onStart: () -> Unit = {}, onEnd: () -> Unit = {}) {

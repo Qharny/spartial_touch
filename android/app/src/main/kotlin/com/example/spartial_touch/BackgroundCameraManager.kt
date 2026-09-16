@@ -50,13 +50,24 @@ class BackgroundCameraManager(
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        val (bitmap, bytes) = imageProxy.image?.toBitmapAndBytes() ?: Pair(null, null)
-                        val timestampNs = imageProxy.imageInfo.timestamp
-                        val timestampMs = timestampNs / 1_000_000
-                        if (bitmap != null && bytes != null) {
-                            onFrame(bitmap, bytes, timestampMs)
+                        // An uncaught exception here (OOM during JPEG compression, a buffer
+                        // closed concurrently, etc.) would crash the whole app — Android
+                        // kills the process for an uncaught exception on ANY thread, not just
+                        // main. imageProxy.close() must also always run, or CameraX's
+                        // STRATEGY_KEEP_ONLY_LATEST backpressure stalls waiting on a buffer
+                        // that never gets released.
+                        try {
+                            val (bitmap, bytes) = imageProxy.image?.toBitmapAndBytes() ?: Pair(null, null)
+                            val timestampNs = imageProxy.imageInfo.timestamp
+                            val timestampMs = timestampNs / 1_000_000
+                            if (bitmap != null && bytes != null) {
+                                onFrame(bitmap, bytes, timestampMs)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("BackgroundCameraManager", "Frame processing failed", e)
+                        } finally {
+                            imageProxy.close()
                         }
-                        imageProxy.close()
                     }
                 }
 
@@ -78,9 +89,19 @@ class BackgroundCameraManager(
     fun stop() {
         lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-        cameraProvider.unbindAll()
-        cameraExecutor.shutdown()
+        // stop() is called from SmartWakeManager's sensor callback, which runs on the main
+        // thread (registered with no Handler) — a blocking .get() here risked an ANR. Mirror
+        // start()'s async addListener pattern instead; the executor is only shut down once
+        // unbindAll() actually completes, so no frame can be submitted to it in between.
+        cameraProviderFuture.addListener({
+            try {
+                cameraProviderFuture.get().unbindAll()
+            } catch (e: Exception) {
+                Log.e("BackgroundCameraManager", "unbindAll failed during stop()", e)
+            } finally {
+                cameraExecutor.shutdown()
+            }
+        }, ContextCompat.getMainExecutor(context))
     }
 
     private fun Image.toBitmapAndBytes(): Pair<Bitmap?, ByteArray?> {

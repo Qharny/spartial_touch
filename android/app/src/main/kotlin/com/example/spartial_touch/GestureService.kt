@@ -67,7 +67,25 @@ class GestureService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        startForegroundNotification()
+
+        // A camera-typed foreground service requires CAMERA to already be granted on
+        // Android 14+ (targetSdk 34) — starting without it throws a SecurityException
+        // that would otherwise crash the whole app process. Bail out cleanly instead.
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.CAMERA
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.e("GestureService", "CAMERA permission not granted — stopping service")
+            instance = null
+            stopSelf()
+            return
+        }
+
+        if (!startForegroundNotification()) {
+            instance = null
+            stopSelf()
+            return
+        }
 
         // Load persisted calibration & performance settings
         val prefs = getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
@@ -170,11 +188,13 @@ class GestureService : Service() {
 
     override fun onDestroy() {
         instance = null
-        appMatcher.stop()
-        smartWake.stop()
-        if (isCameraRunning) cameraManager.stop()
-        handTracker.close()
-        overlay.dismiss()
+        // onCreate() can bail out (missing permission, startForeground failure) before
+        // these are assigned — guard each so the early stopSelf() path doesn't crash here.
+        if (::appMatcher.isInitialized) appMatcher.stop()
+        if (::smartWake.isInitialized) smartWake.stop()
+        if (::cameraManager.isInitialized && isCameraRunning) cameraManager.stop()
+        if (::handTracker.isInitialized) handTracker.close()
+        if (::overlay.isInitialized) overlay.dismiss()
         super.onDestroy()
     }
 
@@ -195,7 +215,8 @@ class GestureService : Service() {
         return START_STICKY
     }
 
-    private fun startForegroundNotification() {
+    /** Returns false if the foreground start failed and the service should stop itself. */
+    private fun startForegroundNotification(): Boolean {
         val channelId = "gesture_service_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -210,13 +231,21 @@ class GestureService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Spatial Touch Gestures")
             .setContentText("Listening for hand gestures...")
-            .setSmallIcon(android.R.drawable.ic_menu_camera) // Replace with app icon
+            .setSmallIcon(R.mipmap.ic_launcher)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
-        } else {
-            startForeground(1, notification)
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+            } else {
+                startForeground(1, notification)
+            }
+            true
+        } catch (e: Exception) {
+            // e.g. SecurityException if a permission was revoked between the check above
+            // and this call, or ForegroundServiceStartNotAllowedException on some OEMs.
+            Log.e("GestureService", "startForeground failed", e)
+            false
         }
     }
 }

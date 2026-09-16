@@ -49,8 +49,19 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "startService" -> {
-                        startGestureService()
-                        result.success(null)
+                        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                                this, android.Manifest.permission.CAMERA
+                            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            result.error(
+                                "PERMISSION_DENIED",
+                                "CAMERA permission is not granted; cannot start the gesture service",
+                                null
+                            )
+                        } else {
+                            startGestureService()
+                            result.success(null)
+                        }
                     }
                     "stopService" -> {
                         stopGestureService()
@@ -58,15 +69,21 @@ class MainActivity : FlutterActivity() {
                     }
                     "performAction" -> {
                         val action = call.arguments as? String
-                        if (action != null) {
+                        if (action == null) {
+                            result.error("INVALID_ARGUMENT", "Action argument is null", null)
+                        } else if (SpatialTouchAccessibilityService.instance == null) {
+                            result.error(
+                                "ACCESSIBILITY_NOT_ENABLED",
+                                "SpatialTouch's Accessibility Service is not enabled in system settings",
+                                null
+                            )
+                        } else {
                             if (action in listOf("back", "home", "recents")) {
                                 SpatialTouchAccessibilityService.instance?.performSystemAction(action)
                             } else {
                                 SpatialTouchAccessibilityService.instance?.dispatchTouchGesture(action)
                             }
                             result.success(null)
-                        } else {
-                            result.error("INVALID_ARGUMENT", "Action argument is null", null)
                         }
                     }
                     "loadProfiles" -> {

@@ -71,9 +71,15 @@ class ActiveHoursScheduler {
       await GestureChannel.startService();
       return;
     }
-    // Check immediately then every 60 seconds
+    // Check immediately — let a failure here propagate to our caller (e.g. the Home
+    // screen toggle, which needs to know startup failed and revert its UI) — then
+    // poll every 60 seconds, where failures are swallowed since nothing is awaiting
+    // that tick and there's no UI to report back to.
     await _check();
-    _checkTimer = Timer.periodic(const Duration(seconds: 60), (_) => _check());
+    _checkTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _check().catchError((_) {}),
+    );
   }
 
   void stop() {
