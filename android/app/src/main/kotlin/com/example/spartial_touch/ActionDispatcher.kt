@@ -18,15 +18,27 @@ import android.util.Log
  */
 class ActionDispatcher(private val context: Context) {
 
-    // Current mapping: gesture key → action id, loaded from active profile.
-    // setMappings() runs on the main thread (profile switches); dispatch() is read from
-    // HandTracker's MediaPipe result-listener thread — needs a thread-safe map.
-    private val mappings = java.util.concurrent.ConcurrentHashMap<String, String>()
+    companion object {
+        /** Actions that are injected through the AccessibilityService rather than AudioManager. */
+        private val ACCESSIBILITY_ACTIONS = setOf(
+            "scroll_up", "scroll_down", "swipe_left", "swipe_right", "tap",
+            "back", "home", "recents", "screenshot"
+        )
 
-    /** Update the active mapping (called from GestureService when profile changes) */
+        fun requiresAccessibility(actionId: String) = actionId in ACCESSIBILITY_ACTIONS
+    }
+
+    // Current mapping: gesture key → action id, resolved for the foreground app.
+    // setMappings() runs on the main thread (profile switches / saves) while dispatch() is
+    // read from HandTracker's MediaPipe result-listener thread. Swapping an immutable
+    // snapshot through a volatile reference means a reader never observes a half-filled map
+    // (clear()+putAll() on a shared map briefly exposed an empty mapping to the gesture thread).
+    @Volatile
+    private var mappings: Map<String, String> = emptyMap()
+
+    /** Update the active mapping (called from GestureService when the profile or foreground app changes) */
     fun setMappings(newMappings: Map<String, String>) {
-        mappings.clear()
-        mappings.putAll(newMappings)
+        mappings = HashMap(newMappings)
         Log.d("ActionDispatcher", "Profile loaded: $mappings")
     }
 
@@ -39,20 +51,34 @@ class ActionDispatcher(private val context: Context) {
         val actionId = mappings[gestureKey] ?: return false
 
         Log.d("ActionDispatcher", "Dispatching: $gestureKey → $actionId")
+        return execute(actionId)
+    }
+
+    /**
+     * Runs a single action by id, independent of any gesture mapping — used both by [dispatch]
+     * and by the app's "test this action" button. Returns false if the action is unknown or
+     * needs the AccessibilityService and it isn't connected.
+     */
+    fun execute(actionId: String): Boolean {
+        val accessibility = SpatialTouchAccessibilityService.instance
+        if (requiresAccessibility(actionId) && accessibility == null) {
+            Log.w("ActionDispatcher", "Accessibility service not connected — cannot run $actionId")
+            return false
+        }
 
         return when (actionId) {
             // Touch injection via AccessibilityService
             "scroll_up", "scroll_down",
             "swipe_left", "swipe_right",
             "tap" -> {
-                SpatialTouchAccessibilityService.instance?.dispatchTouchGesture(actionId)
+                accessibility?.dispatchTouchGesture(actionId)
                 true
             }
 
             // System navigation
-            "back"    -> { SpatialTouchAccessibilityService.instance?.performSystemAction("back"); true }
-            "home"    -> { SpatialTouchAccessibilityService.instance?.performSystemAction("home"); true }
-            "recents" -> { SpatialTouchAccessibilityService.instance?.performSystemAction("recents"); true }
+            "back"    -> { accessibility?.performSystemAction("back"); true }
+            "home"    -> { accessibility?.performSystemAction("home"); true }
+            "recents" -> { accessibility?.performSystemAction("recents"); true }
 
             // Media controls via AudioManager broadcast
             "media_play_pause" -> { sendMediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE); true }
@@ -79,8 +105,9 @@ class ActionDispatcher(private val context: Context) {
 
             // Screenshot via global action
             "screenshot" -> {
-                SpatialTouchAccessibilityService.instance
-                    ?.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT)
+                accessibility?.performGlobalAction(
+                    android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT
+                )
                 true
             }
 

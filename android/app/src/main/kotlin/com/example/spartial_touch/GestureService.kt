@@ -53,7 +53,8 @@ class GestureService : Service() {
 
     fun getActiveProfileName(): String {
         val pkg = activeProfilePackage
-        if (pkg == "__default__") return "Default"
+        // An app with no profile of its own runs on the default assignments — report that.
+        if (pkg == "__default__" || !profileCache.containsKey(pkg)) return "Default"
         return try {
             val pm = packageManager
             val info = pm.getApplicationInfo(pkg, 0)
@@ -137,10 +138,7 @@ class GestureService : Service() {
         // ForegroundAppMatcher — auto-switch profiles when app changes
         appMatcher = ForegroundAppMatcher(this) { packageName ->
             activeProfilePackage = packageName
-            val mappings = profileCache[packageName]
-                ?: profileCache["__default__"]
-                ?: emptyMap()
-            actionDispatcher.setMappings(mappings)
+            applyMappingsFor(packageName)
             Log.d("GestureService", "Profile switched → $packageName")
         }
         appMatcher.start()
@@ -202,9 +200,25 @@ class GestureService : Service() {
     fun loadProfileMappings(allProfiles: Map<String, Map<String, String>>) {
         profileCache.clear()
         profileCache.putAll(allProfiles)
-        // Immediately apply for the current foreground app
-        val defaultMappings = profileCache["__default__"] ?: emptyMap()
-        actionDispatcher.setMappings(defaultMappings)
+        // Re-resolve for whatever app is currently in front. This used to always apply the
+        // default profile, so saving an assignment had no effect on the foreground app's
+        // own overrides until the user switched apps and back.
+        applyMappingsFor(activeProfilePackage)
+    }
+
+    /**
+     * Resolves the effective gesture → action map for [packageName]: the global (default)
+     * assignments, with that app's own assignments layered on top. An app profile therefore
+     * only needs to list the gestures it *overrides* — everything else keeps its global action
+     * instead of silently doing nothing.
+     */
+    private fun applyMappingsFor(packageName: String) {
+        val merged = HashMap<String, String>()
+        profileCache["__default__"]?.let { merged.putAll(it) }
+        if (packageName != "__default__") {
+            profileCache[packageName]?.let { merged.putAll(it) }
+        }
+        actionDispatcher.setMappings(merged)
     }
 
     override fun onBind(intent: Intent?): IBinder? {

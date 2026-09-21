@@ -113,6 +113,29 @@ class AppProfile {
       );
 }
 
+/// One app's action for a single gesture.
+class AppBinding {
+  const AppBinding({
+    required this.packageName,
+    required this.displayName,
+    required this.actionId,
+  });
+
+  final String packageName;
+  final String displayName;
+  final String actionId;
+}
+
+/// Everything a single gesture is assigned to: its global action plus any
+/// per-app overrides. The native side layers an app's override over the global
+/// action, so an app only appears in [overrides] for gestures it changes.
+class GestureBindings {
+  const GestureBindings({this.globalActionId, this.overrides = const []});
+
+  final String? globalActionId;
+  final List<AppBinding> overrides;
+}
+
 // ── Built-in starter profiles ────────────────────────────────────────────────
 
 List<AppProfile> get builtInProfiles => [

@@ -10,9 +10,13 @@ class GestureCard extends StatefulWidget {
     this.onTap,
     this.onToggleChanged,
     this.onDelete,
+    this.subtitle,
   });
 
   final String title;
+
+  /// What the gesture currently does (e.g. "Scroll Up"), or null to show nothing.
+  final String? subtitle;
   final IconData icon;
   final bool isActive;
   final VoidCallback? onTap;
@@ -107,6 +111,20 @@ class _GestureCardState extends State<GestureCard> {
                 color: _enabled ? cs.onSurface : cs.onSurfaceVariant,
               ),
             ),
+            if (widget.subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                widget.subtitle!,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 11,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
             const Spacer(),
           ],
         ),

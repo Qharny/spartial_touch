@@ -47,6 +47,31 @@ class GestureChannel {
         'enabled': enabled,
       });
 
+  /// Whether SpatialTouchAccessibilityService is actually connected — i.e. the
+  /// user has genuinely enabled it in system Accessibility settings, not just
+  /// visited the settings screen. Dart can't observe this any other way.
+  static Future<bool> isAccessibilityServiceEnabled() async {
+    try {
+      return await _channel.invokeMethod<bool>('isAccessibilityServiceEnabled') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Whether the "Usage access" special permission is granted. Without it the native
+  /// ForegroundAppMatcher can't tell which app is open, so per-app assignments never apply.
+  static Future<bool> hasUsageAccess() async {
+    try {
+      return await _channel.invokeMethod<bool>('hasUsageAccess') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Opens Android's Usage access settings screen.
+  static Future<void> openUsageAccessSettings() =>
+      _channel.invokeMethod('openUsageAccessSettings');
+
   /// Fetch active profile, total gesture count, and efficiency impact from the service.
   static Future<Map<String, dynamic>> getServiceStats() async {
     try {
