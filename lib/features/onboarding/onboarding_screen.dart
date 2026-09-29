@@ -5,6 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../core/app_session.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
+import '../../core/services/gesture_channel.dart';
+import '../calibration/calibration_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page data model
@@ -113,7 +115,8 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with WidgetsBindingObserver {
   final _ctrl = PageController();
   int _page = 0;
 
@@ -122,9 +125,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// True while an async permission request is in flight (locks the button).
   bool _busy = false;
-
-  /// True while the calibration sweep is running.
-  bool _calibrating = false;
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -136,7 +136,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   /// Label shown on the primary button — reflects in-flight / completed state.
   String get _primaryLabel {
-    if (_calibrating) return 'Calibrating…';
     final step = _current.step;
     final done = _done.contains(step);
     if (done &&
@@ -175,7 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // ── Primary action — branches on the current step ──────────────────────────
 
   Future<void> _onPrimary() async {
-    if (_busy || _calibrating) return;
+    if (_busy) return;
     final step = _current.step;
 
     // Already satisfied → just advance.
@@ -205,7 +204,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // ── Secondary action — the "skip / manual / already done" link ──────────────
 
   Future<void> _onSecondary() async {
-    if (_busy || _calibrating) return;
+    if (_busy) return;
     switch (_current.step) {
       case OnboardingStep.welcome:
         await _finish(); // skip the whole funnel
@@ -243,12 +242,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _openAccessibilitySettings() async {
-    // We can't reliably detect the service from Dart, so opening the settings
-    // marks the step as "visited" — the button then becomes "Continue".
+    // Don't mark this done yet — it's only true once the user actually flips
+    // the toggle in system settings. didChangeAppLifecycleState below checks
+    // the real native state when the user returns to the app.
     await AppSettings.openAppSettings(type: AppSettingsType.accessibility);
     if (!mounted) return;
-    setState(() => _done.add(OnboardingStep.accessibility));
-    _snack('Enable SpartialTouch, then return and tap Continue.');
+    _snack('Enable SpartialTouch, then return here.');
+  }
+
+  /// Queries whether SpatialTouchAccessibilityService is actually connected
+  /// and updates _done to match — called on app resume, since that's the
+  /// only reliable way to know the user really enabled it in Settings.
+  Future<void> _refreshAccessibilityStatus() async {
+    final enabled = await GestureChannel.isAccessibilityServiceEnabled();
+    if (!mounted) return;
+    setState(() {
+      if (enabled) {
+        _done.add(OnboardingStep.accessibility);
+      } else {
+        _done.remove(OnboardingStep.accessibility);
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshAccessibilityStatus();
+    }
   }
 
   Future<void> _requestOverlay() async {
@@ -262,14 +283,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _next(); // optional — always advance
   }
 
+  /// Pushes the real calibration wizard (live camera + confidence/motion
+  /// sliders, same one reachable later from Settings) rather than faking a
+  /// delay — this step used to just wait 2.2s and mark itself done without
+  /// ever measuring anything, despite its own copy claiming otherwise.
+  /// CalibrationScreen pops `true` only once the user actually saves.
   Future<void> _runCalibration() async {
-    setState(() => _calibrating = true);
-    await Future<void>.delayed(const Duration(milliseconds: 2200));
-    if (!mounted) return;
-    setState(() {
-      _calibrating = false;
-      _done.add(OnboardingStep.calibration);
-    });
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const CalibrationScreen()),
+    );
+    if (!mounted || completed != true) return;
+    setState(() => _done.add(OnboardingStep.calibration));
     _next();
   }
 
@@ -283,7 +307,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ctrl.dispose();
     super.dispose();
   }
@@ -394,7 +425,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   secondaryLabel: _current.secondaryLabel,
                   isLight: _isLight,
                   fg: _fg,
-                  busy: _busy || _calibrating,
+                  busy: _busy,
                   granted: _done.contains(_current.step) &&
                       _current.step != OnboardingStep.welcome &&
                       _current.step != OnboardingStep.profile,

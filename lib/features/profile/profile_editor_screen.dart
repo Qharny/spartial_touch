@@ -3,48 +3,13 @@ import '../../core/theme/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
+import '../../core/models/gesture_catalog.dart';
 import '../../core/models/profile.dart';
 import '../../core/models/profile_database.dart';
 
-/// The 13 gestures GestureInterpreter.kt can actually emit. Keys must match
-/// exactly — they're sent to the native ActionDispatcher as-is.
-const List<(String, String)> _availableGestures = [
-  ('WAVE_UP', 'Wave Up'),
-  ('WAVE_DOWN', 'Wave Down'),
-  ('WAVE_LEFT', 'Wave Left'),
-  ('WAVE_RIGHT', 'Wave Right'),
-  ('OPEN_PALM_HOLD', 'Open Palm Hold'),
-  ('THUMBS_UP', 'Thumbs Up'),
-  ('THUMBS_DOWN', 'Thumbs Down'),
-  ('INDEX_POINT_UP', 'Index Point Up'),
-  ('PINCH', 'Pinch'),
-  ('TWO_FINGER_SWIPE_LEFT', 'Two-Finger Swipe Left'),
-  ('TWO_FINGER_SWIPE_RIGHT', 'Two-Finger Swipe Right'),
-  ('FIST_PUMP', 'Fist Pump'),
-  ('ROCK_SIGN', 'Rock Sign'),
-];
-
-/// The actionIds ActionDispatcher.kt actually understands. Must match exactly.
-const List<(String, String)> _availableActions = [
-  ('scroll_up', 'Scroll Up'),
-  ('scroll_down', 'Scroll Down'),
-  ('swipe_left', 'Swipe Left'),
-  ('swipe_right', 'Swipe Right'),
-  ('tap', 'Tap'),
-  ('back', 'Go Back'),
-  ('home', 'Go Home'),
-  ('recents', 'Recent Apps'),
-  ('media_play_pause', 'Play / Pause'),
-  ('media_next', 'Next Track'),
-  ('media_previous', 'Previous Track'),
-  ('volume_up', 'Volume Up'),
-  ('volume_down', 'Volume Down'),
-  ('screenshot', 'Screenshot'),
-];
-
-String _actionLabel(String actionId) => _availableActions
-    .firstWhere((a) => a.$1 == actionId, orElse: () => (actionId, actionId))
-    .$2;
+// Gesture/action vocabulary lives in gesture_catalog.dart — keys must match
+// GestureInterpreter.kt / ActionDispatcher.kt exactly.
+const _availableGestures = kGestures;
 
 class ProfileEditorScreen extends StatefulWidget {
   const ProfileEditorScreen({super.key});
@@ -73,8 +38,9 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
 
   Future<void> _loadInstalledApps() async {
     try {
-      // Get all non-system apps with their icons
-      List<AppInfo> apps = await InstalledApps.getInstalledApps(excludeSystemApps: true, withIcon: true);
+      // Include system apps (YouTube, Chrome, ... ship as system apps); non-launchable
+      // ones are still filtered out by the plugin's default.
+      List<AppInfo> apps = await InstalledApps.getInstalledApps(excludeSystemApps: false, withIcon: true);
       // Sort apps alphabetically
       apps.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
@@ -195,11 +161,11 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
         return ListView.builder(
           shrinkWrap: true,
           padding: const EdgeInsets.symmetric(vertical: 16),
-          itemCount: _availableActions.length + 1,
+          itemCount: kActions.length + 1,
           itemBuilder: (ctx, index) {
             // Index 0 is the "None" (unmapped) option; the rest are real actions.
-            final actionId = index == 0 ? null : _availableActions[index - 1].$1;
-            final label = index == 0 ? 'None' : _availableActions[index - 1].$2;
+            final actionId = index == 0 ? null : kActions[index - 1].id;
+            final label = index == 0 ? 'None' : kActions[index - 1].label;
             return ListTile(
               title: Text(
                 label,
@@ -239,7 +205,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
         .map((e) => GestureMapping(
               gestureKey: e.key,
               actionId: e.value!,
-              actionLabel: _actionLabel(e.value!),
+              actionLabel: actionLabel(e.value!),
             ))
         .toList();
 
@@ -390,7 +356,7 @@ class _ProfileEditorScreenState extends State<ProfileEditorScreen> {
               title: _availableGestures[i].$2,
               action: switch (_gestureMappings[_availableGestures[i].$1]) {
                 null => 'None',
-                final id => _actionLabel(id),
+                final id => actionLabel(id),
               },
               onTap: () => _showActionSelector(_availableGestures[i].$1),
             ),

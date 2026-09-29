@@ -71,19 +71,18 @@ class MainActivity : FlutterActivity() {
                         val action = call.arguments as? String
                         if (action == null) {
                             result.error("INVALID_ARGUMENT", "Action argument is null", null)
-                        } else if (SpatialTouchAccessibilityService.instance == null) {
+                        } else if (ActionDispatcher.requiresAccessibility(action) &&
+                            SpatialTouchAccessibilityService.instance == null
+                        ) {
                             result.error(
                                 "ACCESSIBILITY_NOT_ENABLED",
                                 "SpatialTouch's Accessibility Service is not enabled in system settings",
                                 null
                             )
-                        } else {
-                            if (action in listOf("back", "home", "recents")) {
-                                SpatialTouchAccessibilityService.instance?.performSystemAction(action)
-                            } else {
-                                SpatialTouchAccessibilityService.instance?.dispatchTouchGesture(action)
-                            }
+                        } else if (ActionDispatcher(this).execute(action)) {
                             result.success(null)
+                        } else {
+                            result.error("UNKNOWN_ACTION", "Unknown action: $action", null)
                         }
                     }
                     "loadProfiles" -> {
@@ -165,6 +164,19 @@ class MainActivity : FlutterActivity() {
                         }
                         result.success(null)
                     }
+                    "isAccessibilityServiceEnabled" -> {
+                        result.success(SpatialTouchAccessibilityService.instance != null)
+                    }
+                    "hasUsageAccess" -> {
+                        result.success(hasUsageAccess())
+                    }
+                    "openUsageAccessSettings" -> {
+                        startActivity(
+                            Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -182,6 +194,26 @@ class MainActivity : FlutterActivity() {
                 result.notImplemented()
             }
         }
+    }
+
+    /**
+     * Whether the "Usage access" special permission is granted. ForegroundAppMatcher relies on
+     * UsageStatsManager, which silently returns nothing without it — per-app gesture
+     * assignments would save but never trigger.
+     */
+    @Suppress("DEPRECATION")
+    private fun hasUsageAccess(): Boolean {
+        val appOps = getSystemService(android.content.Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+        val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            appOps.unsafeCheckOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName
+            )
+        } else {
+            appOps.checkOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName
+            )
+        }
+        return mode == android.app.AppOpsManager.MODE_ALLOWED
     }
 
     private fun startGestureService() {

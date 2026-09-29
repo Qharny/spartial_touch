@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import '../../core/models/gesture_catalog.dart';
+import '../../core/models/profile_database.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/gesture_channel.dart';
@@ -16,6 +18,9 @@ class GestureLibraryScreen extends StatefulWidget {
 class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
   List<Map<String, dynamic>> _customGestures = [];
   List<Map<String, dynamic>> _builtInGestures = [];
+
+  /// gestureKey → global actionId, shown as each card's subtitle.
+  Map<String, String> _globalActions = {};
 
   static const List<Map<String, String>> _builtInGesturesList = [
     {
@@ -124,9 +129,13 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
       });
     }
 
+    final globalActions = await ProfileDatabase.instance.getGlobalActions();
+
+    if (!mounted) return;
     setState(() {
       _customGestures = customStrs.map((s) => jsonDecode(s) as Map<String, dynamic>).toList();
       _builtInGestures = builtIns;
+      _globalActions = globalActions;
     });
   }
 
@@ -199,7 +208,7 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.9,
+        childAspectRatio: 0.8,
         children: [
           ...List.generate(_builtInGestures.length, (index) {
             final gesture = _builtInGestures[index];
@@ -207,18 +216,26 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
               title: gesture['title'] ?? '',
               icon: _getIconFromString(gesture['icon'] ?? ''),
               isActive: gesture['isActive'] ?? true,
+              subtitle: switch (_globalActions[gesture['key']]) {
+                null => 'Not assigned',
+                final id => actionLabel(id),
+              },
               onToggleChanged: (val) => _toggleGesture(gesture['key'], val),
-              onTap: () => Navigator.of(context).pushNamed(
-                AppRoutes.gestureDetail,
-                arguments: {
-                  'title': gesture['title'] ?? '',
-                  'icon': gesture['icon'] ?? '',
-                  'isActive': gesture['isActive'] ?? true,
-                  'isCustom': false,
-                  'baseGesture': gesture['key'] ?? '',
-                  'description': gesture['description'] ?? '',
-                },
-              ),
+              onTap: () async {
+                await Navigator.of(context).pushNamed(
+                  AppRoutes.gestureDetail,
+                  arguments: {
+                    'title': gesture['title'] ?? '',
+                    'icon': gesture['icon'] ?? '',
+                    'isActive': gesture['isActive'] ?? true,
+                    'isCustom': false,
+                    'baseGesture': gesture['key'] ?? '',
+                    'description': gesture['description'] ?? '',
+                  },
+                );
+                // Assignments may have changed on the detail screen.
+                _loadGestures();
+              },
             );
           }),
           ...List.generate(_customGestures.length, (index) {
