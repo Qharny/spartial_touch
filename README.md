@@ -221,8 +221,8 @@ All camera processing is on-device. No frames are saved or transmitted.
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-username/spatialtouch.git
-cd spatialtouch
+git clone https://github.com/Qharny/spartial_touch.git
+cd spartial_touch
 
 # Install dependencies
 flutter pub get
@@ -287,12 +287,12 @@ spatialtouch/
 
 | Phase | Status | Description |
 |---|---|---|
-| v0.1 — Foundation | 🔲 | Foreground service + Accessibility Service scaffolding |
-| v0.2 — Vision Core | 🔲 | MediaPipe integration, wave up/down detection |
-| v0.3 — Background Engine | 🔲 | Camera in background, smart wake, overlay |
-| v0.4 — Full Customization | 🔲 | Complete gesture + action library, profile system |
-| v0.5 — Polish & UX | 🔲 | Onboarding, calibration, active hours, battery modes |
-| v1.0 — Release | 🔲 | Play Store submission, demo video, portfolio docs |
+| v0.1 — Foundation | ✅ | Foreground service + Accessibility Service scaffolding |
+| v0.2 — Vision Core | ✅ | MediaPipe integration, wave up/down detection |
+| v0.3 — Background Engine | ✅ | Camera in background, smart wake, overlay |
+| v0.4 — Full Customization | ✅ | Complete gesture + action library, profile system |
+| v0.5 — Polish & UX | ✅ | Onboarding, calibration, active hours, battery modes |
+| v1.0 — Release | 🟡 | Code ready; device testing, Play Console declarations and submission remain (see [docs/RELEASE.md](docs/RELEASE.md)) |
 
 ---
 
@@ -302,7 +302,7 @@ spatialtouch/
 - **No analytics** — no crash reporting, no usage tracking
 - **No account required** — works fully offline
 - **Foreground notification always visible** when camera is active
-- Full privacy policy available at: `[your-privacy-policy-url]`
+- Full privacy policy: [`docs/PRIVACY_POLICY.md`](docs/PRIVACY_POLICY.md) (host it and link the public URL here before publishing)
 
 ---
 
