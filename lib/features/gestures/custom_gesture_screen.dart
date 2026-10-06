@@ -1,12 +1,21 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../main.dart';
+import '../../core/models/custom_pose.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/gesture_channel.dart';
 
+/// One recorded training sample of the pose being created.
+class _Sample {
+  bool captured = false;
+  String? quality; // 'Excellent' | 'Good' | 'Unsteady'
+  List<double>? landmarks; // averaged raw landmarks, 42 values
+}
+
+/// Records a custom hand pose from real MediaPipe landmarks: three held samples,
+/// each graded by how steady the hand was, then a live test against them.
 class CustomGestureScreen extends StatefulWidget {
   const CustomGestureScreen({super.key});
 
@@ -20,42 +29,40 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
   // ── Stage 1 Fields ─────────────────────────────────────────────────────────
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
-  String _category = 'Motion-based'; // 'Motion-based' | 'Hold-based'
-  String _selectedBaseGesture = 'Wave';
-
-  final List<String> _baseGestures = ['Wave', 'Swipe', 'Pinch', 'Circle', 'Spread'];
 
   // ── Stage 2 Fields ─────────────────────────────────────────────────────────
   bool _cameraReady = false;
+  bool _cameraDenied = false;
   StreamSubscription? _cameraFrameSub;
 
   // ── Stage 3 Fields ─────────────────────────────────────────────────────────
+  static const _minFrames = 8;
   int _countdown = 0;
   bool _isRecording = false;
   int _activeSampleIndex = 0;
   Timer? _countdownTimer;
   Timer? _recordProgressTimer;
   double _recordProgress = 0.0;
+  String? _sampleError;
+  final List<List<double>> _recordFrames = [];
+  StreamSubscription<List<double>>? _landmarkSub;
 
-  final List<Map<String, dynamic>> _samples = [
-    {'id': 1, 'captured': false, 'quality': null},
-    {'id': 2, 'captured': false, 'quality': null},
-    {'id': 3, 'captured': false, 'quality': null},
-  ];
+  final List<_Sample> _samples = [_Sample(), _Sample(), _Sample()];
 
   // ── Stage 4 Fields ─────────────────────────────────────────────────────────
-  StreamSubscription? _gestureSub;
   bool _testSuccess = false;
-  String _detectedGestureName = '';
   double _detectedConfidence = 0.0;
+  int _testMatchFrames = 0;
   Timer? _successFlashTimer;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    // Bypassing SmartWake ensures the camera initializes instantly for preview/recording
-    GestureChannel.setSmartWakeEnabled(false);
-    _startCameraCheck();
+    _startCamera();
+    // Every frame with a visible hand: recorded while a sample is capturing,
+    // matched against the samples on the test step.
+    _landmarkSub = GestureChannel.landmarkStream.listen(_onLandmarks);
   }
 
   @override
@@ -63,26 +70,41 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
     _nameController.dispose();
     _descController.dispose();
     _cameraFrameSub?.cancel();
+    _landmarkSub?.cancel();
     _countdownTimer?.cancel();
     _recordProgressTimer?.cancel();
-    _gestureSub?.cancel();
     _successFlashTimer?.cancel();
-    
-    // Restore SmartWake when bailing out of the wizard
+    // Restore SmartWake and stop the service if only this screen started it.
     GestureChannel.setSmartWakeEnabled(true);
+    gestureRecognitionService.stopListening();
     super.dispose();
   }
 
   // ── Camera Flow ────────────────────────────────────────────────────────────
-  void _startCameraCheck() {
+  Future<void> _startCamera() async {
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (mounted) setState(() => _cameraDenied = true);
+      return;
+    }
+    // The wizard needs the engine running and the camera forced on. It used to
+    // only bypass SmartWake, so with the service off no frame ever arrived.
+    await gestureRecognitionService.startListening();
+    await GestureChannel.setSmartWakeEnabled(false);
     _cameraFrameSub?.cancel();
     _cameraFrameSub = GestureChannel.cameraFrameStream.listen((_) {
-      if (!_cameraReady && mounted) {
-        setState(() {
-          _cameraReady = true;
-        });
-      }
+      if (!_cameraReady && mounted) setState(() => _cameraReady = true);
     });
+  }
+
+  void _onLandmarks(List<double> frame) {
+    if (frame.length < PoseMath.points * 2) return;
+    final points = frame.sublist(0, PoseMath.points * 2);
+    if (_isRecording) {
+      _recordFrames.add(points);
+    } else if (_currentStep == 4) {
+      _testFrame(points);
+    }
   }
 
   // ── Stage 3 Logic: Recording ────────────────────────────────────────────────
@@ -92,132 +114,150 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
       _countdown = 3;
       _isRecording = false;
       _recordProgress = 0.0;
+      _sampleError = null;
     });
 
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {
-          if (_countdown > 1) {
-            _countdown--;
-          } else {
-            _countdown = 0;
-            timer.cancel();
-            _startRecording();
-          }
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        if (_countdown > 1) {
+          _countdown--;
+        } else {
+          _countdown = 0;
+          timer.cancel();
+          _startRecording();
+        }
+      });
     });
   }
 
   void _startRecording() {
+    _recordFrames.clear();
     setState(() {
       _isRecording = true;
       _recordProgress = 0.0;
     });
 
-    const totalTicks = 30; // 30 ticks over 1.5 seconds (50ms interval)
+    const totalTicks = 30; // 1.5 seconds at 50ms
     int currentTick = 0;
 
     _recordProgressTimer?.cancel();
     _recordProgressTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      if (mounted) {
-        setState(() {
-          currentTick++;
-          _recordProgress = currentTick / totalTicks;
-          if (currentTick >= totalTicks) {
-            timer.cancel();
-            _isRecording = false;
-            _finalizeSample();
-          }
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        currentTick++;
+        _recordProgress = currentTick / totalTicks;
+        if (currentTick >= totalTicks) {
+          timer.cancel();
+          _isRecording = false;
+          _finalizeSample();
+        }
+      });
     });
   }
 
   void _finalizeSample() {
-    // Simulated quality score based on camera availability (Excellent/Good)
-    final random = Random();
-    final quality = random.nextBool() ? 'Excellent' : 'Good';
+    final sample = _samples[_activeSampleIndex];
+    final frames = List<List<double>>.of(_recordFrames);
+    _recordFrames.clear();
 
-    setState(() {
-      _samples[_activeSampleIndex]['captured'] = true;
-      _samples[_activeSampleIndex]['quality'] = quality;
-    });
+    if (frames.length < _minFrames) {
+      sample
+        ..captured = false
+        ..quality = null
+        ..landmarks = null;
+      _sampleError = frames.isEmpty
+          ? "Couldn't see your hand. Keep it fully in view and try again."
+          : 'Your hand was only visible briefly. Hold it in view and try again.';
+      return;
+    }
+
+    // Steadiness grades the sample: mean drift of each frame from the average pose.
+    final jitter = PoseMath.jitter(frames);
+    sample
+      ..captured = true
+      ..landmarks = PoseMath.average(frames)
+      ..quality = jitter < 0.08
+          ? 'Excellent'
+          : jitter < 0.16
+              ? 'Good'
+              : 'Unsteady';
+    _sampleError = null;
+
+    // Move on to the next sample that still needs recording.
+    final next = _samples.indexWhere((s) => !s.captured);
+    if (next != -1) _activeSampleIndex = next;
   }
 
   void _redoSample(int index) {
     setState(() {
-      _samples[index]['captured'] = false;
-      _samples[index]['quality'] = null;
+      _samples[index]
+        ..captured = false
+        ..quality = null
+        ..landmarks = null;
     });
     _startCountdown(index);
   }
 
   // ── Stage 4 Logic: Live Testing Sandbox ─────────────────────────────────────
-  void _startGestureTesting() {
-    _gestureSub?.cancel();
-    _gestureSub = GestureChannel.gestureStream.listen((payload) {
-      final parts = payload.split(':');
-      if (parts.length == 2 && mounted) {
-        final rawGesture = parts[0];
-        final confidence = double.tryParse(parts[1]) ?? 0.0;
+  /// Same rule the engine uses: within the match radius of any sample for
+  /// HOLD_FRAMES consecutive frames.
+  void _testFrame(List<double> raw) {
+    final frame = PoseMath.normalize(raw);
+    if (frame == null) return;
+    var best = double.infinity;
+    for (final s in _samples) {
+      final n = s.landmarks == null ? null : PoseMath.normalize(s.landmarks!);
+      if (n == null) continue;
+      final d = PoseMath.distance(frame, n);
+      if (d < best) best = d;
+    }
+    if (best > PoseMath.baseMatchThreshold) {
+      _testMatchFrames = 0;
+      return;
+    }
+    _testMatchFrames++;
+    if (_testMatchFrames < 6) return;
+    _testMatchFrames = 0;
 
-        if (_isGestureMatch(rawGesture, _selectedBaseGesture)) {
-          HapticFeedback.mediumImpact();
-          _successFlashTimer?.cancel();
-          
-          setState(() {
-            _testSuccess = true;
-            _detectedGestureName = _nameController.text.trim();
-            _detectedConfidence = confidence;
-          });
-
-          // Flash green and clear success state after 1.5s
-          _successFlashTimer = Timer(const Duration(milliseconds: 1500), () {
-            if (mounted) {
-              setState(() {
-                _testSuccess = false;
-              });
-            }
-          });
-        }
-      }
+    HapticFeedback.mediumImpact();
+    _successFlashTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _testSuccess = true;
+      _detectedConfidence = 1 - 0.5 * (best / PoseMath.baseMatchThreshold);
+    });
+    _successFlashTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _testSuccess = false);
     });
   }
 
-  bool _isGestureMatch(String detected, String selectedBase) {
-    final cleanDetected = detected.toUpperCase();
-    final cleanBase = selectedBase.toUpperCase();
-    
-    // Loosely check match against base categories
-    if (cleanBase == 'WAVE' && cleanDetected.contains('WAVE')) return true;
-    if (cleanBase == 'SWIPE' && cleanDetected.contains('SWIPE')) return true;
-    if (cleanBase == 'PINCH' && cleanDetected.contains('PINCH')) return true;
-    if (cleanBase == 'CIRCLE' && (cleanDetected.contains('CIRCLE') || cleanDetected.contains('ROTARY'))) return true;
-    if (cleanBase == 'SPREAD' && (cleanDetected.contains('SPREAD') || cleanDetected.contains('PALM'))) return true;
-    return false;
-  }
-
-  // ── Database Persistence ───────────────────────────────────────────────────
+  // ── Persistence ────────────────────────────────────────────────────────────
   Future<void> _saveGesture() async {
-    final prefs = await SharedPreferences.getInstance();
-    final gestures = prefs.getStringList('custom_gestures') ?? [];
-
-    final newGesture = {
-      'name': _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Untitled Gesture',
-      'baseGesture': _selectedBaseGesture,
-      'category': _category,
-      'description': _descController.text.trim(),
-    };
-
-    gestures.add(jsonEncode(newGesture));
-    await prefs.setStringList('custom_gestures', gestures);
+    if (_saving) return;
+    setState(() => _saving = true);
+    final name = _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Untitled Gesture';
+    final pose = CustomPose(
+      key: '$kCustomGesturePrefix${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      description: _descController.text.trim(),
+      samples: [for (final s in _samples) if (s.landmarks != null) s.landmarks!],
+    );
+    try {
+      await CustomPoseStore.instance.add(pose);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not save gesture: $e')));
+      }
+      return;
+    }
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gesture "${newGesture['name']}" saved successfully!'),
+          content: Text('"$name" saved. Open it in Gestures to assign an action.'),
           backgroundColor: AppColorsShared.accent,
         ),
       );
@@ -231,11 +271,12 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
       setState(() => _currentStep = 2);
     } else if (_currentStep == 2) {
       setState(() => _currentStep = 3);
-      // Automatically start countdown for first sample
-      _startCountdown(0);
+      _startCountdown(_samples.indexWhere((s) => !s.captured).clamp(0, 2));
     } else if (_currentStep == 3) {
-      setState(() => _currentStep = 4);
-      _startGestureTesting();
+      setState(() {
+        _currentStep = 4;
+        _testMatchFrames = 0;
+      });
     }
   }
 
@@ -243,9 +284,8 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
     if (_currentStep > 1) {
       setState(() {
         _currentStep--;
-        if (_currentStep == 3) {
-          _startCameraCheck();
-        }
+        _isRecording = false;
+        _countdown = 0;
       });
     }
   }
@@ -383,7 +423,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
           style: TextStyle(fontFamily: 'Inter', color: cs.onSurface, fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             labelText: 'Gesture Name',
-            hintText: 'e.g. Double Wave Up',
+            hintText: 'e.g. Peace Sign',
             labelStyle: TextStyle(color: cs.onSurfaceVariant),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
             floatingLabelBehavior: FloatingLabelBehavior.always,
@@ -392,58 +432,27 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
         ),
         const SizedBox(height: 24),
 
-        Text(
-          'CATEGORY',
-          style: TextStyle(fontFamily: 'Space Mono', fontSize: 11, fontWeight: FontWeight.w700, color: cs.onSurfaceVariant, letterSpacing: 0.5),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _CategorySelectorCard(
-                title: 'Motion-based',
-                subtitle: 'Swipes, waves, rotations',
-                icon: Icons.gesture_rounded,
-                selected: _category == 'Motion-based',
-                onTap: () => setState(() => _category = 'Motion-based'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _CategorySelectorCard(
-                title: 'Hold-based',
-                subtitle: 'Static palm or finger signs',
-                icon: Icons.back_hand_rounded,
-                selected: _category == 'Hold-based',
-                onTap: () => setState(() => _category = 'Hold-based'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        Text(
-          'BASE GESTURE MATCH',
-          style: TextStyle(fontFamily: 'Space Mono', fontSize: 11, fontWeight: FontWeight.w700, color: cs.onSurfaceVariant, letterSpacing: 0.5),
-        ),
-        const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            border: Border.all(color: cs.outline),
+            color: AppColorsShared.accent.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(14),
-            color: cs.surfaceContainerHighest.withValues(alpha: 0.2),
+            border: Border.all(color: AppColorsShared.accent.withValues(alpha: 0.4)),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedBaseGesture,
-              dropdownColor: cs.surface,
-              isExpanded: true,
-              items: _baseGestures.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontFamily: 'Inter')))).toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedBaseGesture = val);
-              },
-            ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.back_hand_rounded, color: AppColorsShared.accent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Custom gestures are hand poses: the shape of your hand, held still for about '
+                  'half a second. Pick something distinct from the built-in gestures, like a '
+                  'peace sign or an OK sign.',
+                  style: TextStyle(fontFamily: 'Inter', fontSize: 13, height: 1.45, color: cs.onSurface),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 24),
@@ -481,18 +490,10 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  _selectedBaseGesture == 'Wave'
-                      ? Icons.waves_rounded
-                      : _selectedBaseGesture == 'Swipe'
-                          ? Icons.swipe_rounded
-                          : Icons.back_hand_rounded,
-                  size: 48,
-                  color: AppColorsShared.accent,
-                ),
+                const Icon(Icons.back_hand_rounded, size: 48, color: AppColorsShared.accent),
                 const SizedBox(height: 12),
                 Text(
-                  'Perform a steady ${_selectedBaseGesture.toLowerCase()} motion',
+                  'Make your pose and hold it still',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 14,
@@ -502,7 +503,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Keep your hand upright and open',
+                  'The whole hand must stay inside the camera view',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 12,
@@ -568,7 +569,11 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _cameraReady ? 'CAMERA READY' : 'STARTING CAMERA...',
+                        _cameraDenied
+                            ? 'CAMERA PERMISSION NEEDED'
+                            : _cameraReady
+                                ? 'CAMERA READY'
+                                : 'STARTING CAMERA...',
                         style: TextStyle(
                           fontFamily: 'Space Mono',
                           fontSize: 10,
@@ -598,7 +603,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
         // Quick tips
         _TipItem(icon: Icons.light_mode_rounded, label: 'Ensure your environment is well lit'),
         _TipItem(icon: Icons.center_focus_strong_rounded, label: 'Hold your hand steady directly in front of the camera'),
-        _TipItem(icon: Icons.swipe_left_rounded, label: 'Keep movements moderate (not too fast)'),
+        _TipItem(icon: Icons.pan_tool_alt_rounded, label: 'Record all three samples with the same pose, slightly varying the angle'),
       ],
     );
   }
@@ -686,7 +691,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
           _countdown > 0
               ? 'Get ready...'
               : _isRecording
-                  ? 'Perform gesture!'
+                  ? 'Hold your pose!'
                   : 'Capture 3 training samples',
           style: TextStyle(
             fontFamily: 'Inter',
@@ -695,15 +700,23 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
             color: _isRecording ? const Color(0xFF00E676) : cs.onSurface,
           ),
         ),
+        if (_sampleError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _sampleError!,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: cs.error),
+          ),
+        ],
         const SizedBox(height: 24),
 
         // Sample list cards
         Column(
           children: List.generate(3, (index) {
             final sample = _samples[index];
-            final isCaptured = sample['captured'] as bool;
+            final isCaptured = sample.captured;
             final isCurrent = index == _activeSampleIndex;
-            final quality = sample['quality'] as String?;
+            final quality = sample.quality;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -762,7 +775,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                     ),
                   ] else if (isCurrent && !_isRecording && _countdown == 0)
                     TextButton(
-                      onPressed: () => _startCountdown(index),
+                      onPressed: _cameraReady ? () => _startCountdown(index) : null,
                       child: const Text('Record'),
                     ),
                 ],
@@ -827,7 +840,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                   key: const ValueKey('success'),
                   children: [
                     Text(
-                      '$_detectedGestureName Detected!',
+                      '${_nameController.text.trim()} detected!',
                       style: const TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 18,
@@ -837,7 +850,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${(_detectedConfidence * 100).toInt()}% CONFIDENCE',
+                      '${(_detectedConfidence * 100).toInt()}% MATCH',
                       style: TextStyle(
                         fontFamily: 'Space Mono',
                         fontSize: 11,
@@ -861,7 +874,8 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Perform a ${_selectedBaseGesture.toLowerCase()} movement in front of the camera.',
+                      'Make your pose in front of the camera and hold it still. '
+                      'Then try a different hand shape: it should not match.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Inter',
@@ -903,7 +917,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'If detection fails, make sure your hand is fully upright, visible in the camera circle, and you are not moving too fast.',
+                      'If it never matches, go back and re-record any "Unsteady" samples. If other hand shapes match too, pick a more distinctive pose.',
                       style: TextStyle(
                         fontFamily: 'Inter',
                         fontSize: 11,
@@ -926,7 +940,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
     final cs = Theme.of(context).colorScheme;
 
     final isStage1Valid = _nameController.text.trim().isNotEmpty;
-    final isStage3Valid = _samples.every((s) => s['captured'] == true);
+    final isStage3Valid = _samples.every((s) => s.captured);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -968,7 +982,7 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
                       ? (_cameraReady ? _nextStep : null)
                       : _currentStep == 3
                           ? (isStage3Valid ? _nextStep : null)
-                          : _saveGesture,
+                          : (_saving ? null : _saveGesture),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColorsShared.accent,
                 foregroundColor: Colors.white,
@@ -994,72 +1008,6 @@ class _CustomGestureScreenState extends State<CustomGestureScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Components
 // ─────────────────────────────────────────────────────────────────────────────
-
-class _CategorySelectorCard extends StatelessWidget {
-  const _CategorySelectorCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: selected ? AppColorsShared.accent.withValues(alpha: 0.05) : cs.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? AppColorsShared.accent : cs.outlineVariant,
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              icon,
-              color: selected ? AppColorsShared.accent : cs.onSurfaceVariant,
-              size: 24,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 11,
-                color: cs.onSurfaceVariant,
-                height: 1.3,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _TipItem extends StatelessWidget {
   const _TipItem({required this.icon, required this.label});

@@ -3,11 +3,13 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:installed_apps/installed_apps.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../main.dart';
 import '../../core/models/gesture_catalog.dart';
 import '../../core/models/profile.dart';
 import '../../core/models/profile_database.dart';
 import '../../core/services/gesture_channel.dart';
+import '../../core/services/gesture_recognition_service.dart';
 import '../../core/theme/theme.dart';
 import 'widgets/pickers.dart';
 
@@ -19,7 +21,8 @@ class GestureDetailScreen extends StatefulWidget {
 }
 
 class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsBindingObserver {
-  double _sensitivity = 0.6;
+  /// 0–1, 0.5 = the calibrated default. Persisted per gesture and pushed to the engine.
+  double _sensitivity = 0.5;
 
   bool _isTesting = false;
   String _detectedGesture = 'Waiting...';
@@ -30,7 +33,7 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
 
   // ── Action assignment ──────────────────────────────────────────────────────
   bool _argsLoaded = false;
-  String? _gestureKey; // null for custom gestures, which the engine can't emit yet
+  String? _gestureKey; // engine key: WAVE_UP, CUSTOM_…
   String _gestureTitle = '';
   GestureBindings _bindings = const GestureBindings();
   bool _accessibilityOn = true;
@@ -50,10 +53,10 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
     _argsLoaded = true;
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _gestureTitle = args?['title'] ?? 'Wave Up';
-    final isCustom = args?['isCustom'] ?? false;
     final base = args?['baseGesture'] as String?;
-    _gestureKey = (!isCustom && base != null && base.isNotEmpty) ? base : null;
+    _gestureKey = (base != null && base.isNotEmpty) ? base : null;
     _refreshAssignments();
+    _loadSensitivity();
   }
 
   @override
@@ -72,6 +75,26 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
       GestureChannel.setSmartWakeEnabled(true);
     }
     super.dispose();
+  }
+
+  Future<void> _loadSensitivity() async {
+    final key = _gestureKey;
+    if (key == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getDouble('gesture_sensitivity_$key');
+    if (value != null && mounted) setState(() => _sensitivity = value.clamp(0.0, 1.0));
+  }
+
+  Future<void> _saveSensitivity(double value) async {
+    final key = _gestureKey;
+    if (key == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('gesture_sensitivity_$key', value);
+    try {
+      await GestureChannel.setGestureSensitivity(key, value);
+    } on PlatformException catch (_) {
+      // Saved locally; the engine picks it up from its own copy on next start.
+    }
   }
 
   Future<void> _refreshAssignments() async {
@@ -200,71 +223,19 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
     return ids.any(actionNeedsAccessibility);
   }
 
-  void _onGestureEvent(event) {
+  void _onGestureEvent(GestureEvent event) {
     if (!mounted) return;
     setState(() {
       _detectedGesture = event.name;
       _detectedConfidence = event.confidence;
     });
 
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final title = args?['title'] ?? 'Wave Up';
-    final baseGesture = args?['baseGesture'] ?? '';
-    final isCustom = args?['isCustom'] ?? false;
-
-    if (_isGestureMatch(
-      detected: event.name,
-      baseGesture: baseGesture,
-      isCustom: isCustom,
-      currentTitle: title,
-    )) {
+    if (_gestureKey != null && event.key == _gestureKey) {
       _successTimer?.cancel();
-      setState(() {
-        _successMatched = true;
-      });
+      setState(() => _successMatched = true);
       _successTimer = Timer(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() {
-            _successMatched = false;
-          });
-        }
+        if (mounted) setState(() => _successMatched = false);
       });
-    }
-  }
-
-  bool _isGestureMatch({
-    required String detected,
-    required String baseGesture,
-    required bool isCustom,
-    required String currentTitle,
-  }) {
-    final normalizedDetected = detected.toUpperCase().replaceAll(' ', '_');
-
-    if (isCustom) {
-      final cleanDetected = normalizedDetected;
-      final cleanBase = baseGesture.toUpperCase();
-
-      if (cleanBase == 'WAVE' && cleanDetected.contains('WAVE')) return true;
-      if (cleanBase == 'SWIPE' && cleanDetected.contains('SWIPE')) return true;
-      if (cleanBase == 'PINCH' && cleanDetected.contains('PINCH')) return true;
-      if (cleanBase == 'CIRCLE' && (cleanDetected.contains('CIRCLE') || cleanDetected.contains('ROTARY'))) return true;
-      if (cleanBase == 'SPREAD' && (cleanDetected.contains('SPREAD') || cleanDetected.contains('PALM'))) return true;
-      return false;
-    } else {
-      if (normalizedDetected == baseGesture.toUpperCase()) {
-        return true;
-      }
-
-      final detLower = detected.toLowerCase();
-      final curLower = currentTitle.toLowerCase();
-      if (detLower == curLower) return true;
-
-      // Custom loose matching rules
-      if (curLower == 'palm in' && detLower == 'open palm hold') return true;
-      if (curLower == 'swipe left' && detLower == 'wave left') return true;
-      if (curLower == 'swipe right' && detLower == 'wave right') return true;
-
-      return false;
     }
   }
 
@@ -299,6 +270,7 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
       case 'screen_rotation_rounded': return Icons.screen_rotation_rounded;
       case 'waves': return Icons.waves;
       case 'swipe': return Icons.swipe;
+      case 'front_hand_outlined': return Icons.front_hand_outlined;
       default: return Icons.gesture;
     }
   }
@@ -473,7 +445,11 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
           ),
           const SizedBox(height: 8),
           Text(
-            _getDescription(title),
+            args?['isCustom'] == true
+                ? ((args?['description'] as String?)?.isNotEmpty == true
+                    ? args!['description'] as String
+                    : 'Your recorded hand pose. Hold it steady for about half a second.')
+                : _getDescription(title),
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: 14,
@@ -563,6 +539,7 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
                   child: Slider(
                     value: _sensitivity,
                     onChanged: (v) => setState(() => _sensitivity = v),
+                    onChangeEnd: _saveSensitivity,
                     activeColor: cs.onSurface,
                     inactiveColor: cs.outline,
                   ),
@@ -584,10 +561,7 @@ class _GestureDetailScreenState extends State<GestureDetailScreen> with WidgetsB
 
           // ── Assigned Action ──────────────────────────────────────────────
           if (_gestureKey == null)
-            const _InfoNote(
-              text: "Custom gestures can't trigger actions yet. Only the built-in "
-                  'gestures can be assigned to a task.',
-            )
+            const _InfoNote(text: 'This gesture could not be found. Go back and open it again.')
           else ...[
             if (_needsAccessibility && !_accessibilityOn) ...[
               _PermissionBanner(

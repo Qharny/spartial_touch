@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import '../../core/models/custom_pose.dart';
 import '../../core/models/gesture_catalog.dart';
 import '../../core/models/profile_database.dart';
 import '../../core/router/router.dart';
@@ -16,7 +16,8 @@ class GestureLibraryScreen extends StatefulWidget {
 }
 
 class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
-  List<Map<String, dynamic>> _customGestures = [];
+  List<CustomPose> _customGestures = [];
+  Map<String, bool> _customEnabled = {};
   List<Map<String, dynamic>> _builtInGestures = [];
 
   /// gestureKey → global actionId, shown as each card's subtitle.
@@ -112,8 +113,7 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
   Future<void> _loadGestures() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Load custom gestures
-    final customStrs = prefs.getStringList('custom_gestures') ?? [];
+    final custom = await CustomPoseStore.instance.load();
     
     // Load built-in gestures and check their enabled state in SharedPreferences
     final List<Map<String, dynamic>> builtIns = [];
@@ -133,7 +133,10 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
 
     if (!mounted) return;
     setState(() {
-      _customGestures = customStrs.map((s) => jsonDecode(s) as Map<String, dynamic>).toList();
+      _customGestures = custom;
+      _customEnabled = {
+        for (final p in custom) p.key: prefs.getBool('gesture_enabled_${p.key}') ?? true,
+      };
       _builtInGestures = builtIns;
       _globalActions = globalActions;
     });
@@ -145,16 +148,21 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
     await GestureChannel.setGestureEnabled(key, enabled);
   }
 
-  Future<void> _deleteCustomGesture(int index) async {
-    final prefs = await SharedPreferences.getInstance();
-    final gesturesStrs = prefs.getStringList('custom_gestures') ?? [];
-    if (index >= 0 && index < gesturesStrs.length) {
-      gesturesStrs.removeAt(index);
-      await prefs.setStringList('custom_gestures', gesturesStrs);
-      setState(() {
-        _customGestures.removeAt(index);
-      });
-    }
+  Future<void> _deleteCustomGesture(CustomPose pose) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete "${pose.name}"?'),
+        content: const Text('Its recorded samples and any actions assigned to it are removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await CustomPoseStore.instance.remove(pose.key);
+    _loadGestures();
   }
 
   IconData _getIconFromString(String iconStr) {
@@ -190,10 +198,6 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: () {},
-        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -238,38 +242,35 @@ class _GestureLibraryScreenState extends State<GestureLibraryScreen> {
               },
             );
           }),
-          ...List.generate(_customGestures.length, (index) {
-            final gesture = _customGestures[index];
-            IconData iconData = Icons.gesture;
-            String iconName = 'gesture';
-            if (gesture['baseGesture'] == 'Wave') { iconData = Icons.waves; iconName = 'waves'; }
-            if (gesture['baseGesture'] == 'Swipe') { iconData = Icons.swipe; iconName = 'swipe'; }
-            if (gesture['baseGesture'] == 'Pinch') { iconData = Icons.pinch; iconName = 'pinch_rounded'; }
-            if (gesture['baseGesture'] == 'Circle') { iconData = Icons.rotate_right; iconName = 'rotate_right_rounded'; }
-            if (gesture['baseGesture'] == 'Spread') { iconData = Icons.open_in_full; iconName = 'open_in_full_rounded'; }
-
-            // Retrieve custom gesture enabled state
-            final bool isCustomEnabled = true;
-
-            return GestureCard(
-              title: gesture['name'] ?? 'Custom',
-              icon: iconData,
-              isActive: isCustomEnabled,
-              onToggleChanged: (val) => _toggleGesture(gesture['name'], val),
-              onTap: () => Navigator.of(context).pushNamed(
-                AppRoutes.gestureDetail,
-                arguments: {
-                  'title': gesture['name'] ?? 'Custom',
-                  'icon': iconName,
-                  'isActive': isCustomEnabled,
-                  'isCustom': true,
-                  'baseGesture': gesture['baseGesture'] ?? '',
-                  'description': gesture['description'] ?? '',
-                },
-              ),
-              onDelete: () => _deleteCustomGesture(index),
-            );
-          }),
+          for (final pose in _customGestures)
+            GestureCard(
+              title: pose.name,
+              icon: Icons.front_hand_outlined,
+              isActive: _customEnabled[pose.key] ?? true,
+              subtitle: switch (_globalActions[pose.key]) {
+                null => 'Not assigned',
+                final id => actionLabel(id),
+              },
+              onToggleChanged: (val) {
+                setState(() => _customEnabled[pose.key] = val);
+                _toggleGesture(pose.key, val);
+              },
+              onTap: () async {
+                await Navigator.of(context).pushNamed(
+                  AppRoutes.gestureDetail,
+                  arguments: {
+                    'title': pose.name,
+                    'icon': 'front_hand_outlined',
+                    'isActive': _customEnabled[pose.key] ?? true,
+                    'isCustom': true,
+                    'baseGesture': pose.key,
+                    'description': pose.description,
+                  },
+                );
+                _loadGestures();
+              },
+              onDelete: () => _deleteCustomGesture(pose),
+            ),
         ],
       ),
     );
