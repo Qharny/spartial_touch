@@ -1,5 +1,8 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/app_info.dart';
 import '../../core/router/router.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/performance_mode_service.dart';
@@ -7,18 +10,28 @@ import '../../core/services/active_hours_scheduler.dart';
 import '../../core/services/gesture_channel.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.onNavigateToTab});
+
+  /// Switches the parent shell's tab (1 = Gestures). Null when pushed as a route.
+  final void Function(int index)? onNavigateToTab;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
   bool _enableVisuals = true;
   double _opacity = 0.8;
   bool _hapticsEnabled = true;
   bool _sounds = false;
   bool _dnd = true;
+  bool _smartWake = true;
+
+  // Real permission state, refreshed whenever the app returns to the foreground.
+  bool _cameraGranted = false;
+  bool _accessibilityOn = false;
+  bool _usageAccessOn = false;
+  bool _overlayGranted = false;
   PerformanceMode _performanceMode = PerformanceMode.balanced;
 
   bool _activeHoursEnabled = false;
@@ -30,8 +43,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadActiveApps();
     _loadSettings();
+    _refreshPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from a system settings screen.
+    if (state == AppLifecycleState.resumed) _refreshPermissions();
+  }
+
+  Future<void> _refreshPermissions() async {
+    final camera = await Permission.camera.isGranted;
+    final overlay = await Permission.systemAlertWindow.isGranted;
+    final accessibility = await GestureChannel.isAccessibilityServiceEnabled();
+    final usage = await GestureChannel.hasUsageAccess();
+    if (!mounted) return;
+    setState(() {
+      _cameraGranted = camera;
+      _overlayGranted = overlay;
+      _accessibilityOn = accessibility;
+      _usageAccessOn = usage;
+    });
+  }
+
+  Future<void> _setBool(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
+  Future<void> _pushOverlay() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('overlay_enabled', _enableVisuals);
+    await prefs.setDouble('overlay_opacity', _opacity);
+    await GestureChannel.setOverlaySettings(enabled: _enableVisuals, opacity: _opacity);
   }
 
   Future<void> _loadSettings() async {
@@ -44,6 +97,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) {
       setState(() {
         _hapticsEnabled = prefs.getBool('haptics_enabled') ?? true;
+        _enableVisuals = prefs.getBool('overlay_enabled') ?? true;
+        _opacity = (prefs.getDouble('overlay_opacity') ?? 0.8).clamp(0.2, 1.0);
+        _sounds = prefs.getBool('sounds_enabled') ?? false;
+        _dnd = prefs.getBool('pause_in_dnd') ?? true;
+        _smartWake = prefs.getBool('smart_wake_enabled') ?? true;
         _performanceMode = mode;
         _activeHoursEnabled = ahEnabled;
         _activeHoursStart = ahStart;
@@ -102,7 +160,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'Global Gestures',
             subtitle: 'Gestures that work everywhere',
             icon: Icons.public_rounded,
-            onTap: () {},
+            // Global actions are set per gesture in the Gestures tab.
+            onTap: () => widget.onNavigateToTab != null
+                ? widget.onNavigateToTab!(1)
+                : Navigator.of(context).pushNamed(AppRoutes.gestureLibrary),
           ),
           
           const SizedBox(height: 32),
@@ -114,10 +175,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.layers_outlined,
             children: [
               _SettingsRow(
-                label: 'Enable Gesture Visuals',
+                label: 'Floating Status Overlay',
                 trailing: Switch(
                   value: _enableVisuals,
-                  onChanged: (v) => setState(() => _enableVisuals = v),
+                  onChanged: (v) {
+                    setState(() => _enableVisuals = v);
+                    _pushOverlay();
+                  },
                   activeThumbColor: cs.surface,
                   activeTrackColor: AppColorsShared.accent,
                 ),
@@ -128,10 +192,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 120,
                   child: Slider(
                     value: _opacity,
-                    onChanged: (v) => setState(() => _opacity = v),
+                    min: 0.2,
+                    max: 1.0,
+                    onChanged: _enableVisuals ? (v) => setState(() => _opacity = v) : null,
+                    onChangeEnd: (_) => _pushOverlay(),
                     activeColor: cs.onSurface,
                     inactiveColor: cs.outline,
                   ),
+                ),
+              ),
+              _SettingsRow(
+                label: 'Smart Wake (saves battery)',
+                trailing: Switch(
+                  value: _smartWake,
+                  onChanged: (v) async {
+                    setState(() => _smartWake = v);
+                    await _setBool('smart_wake_enabled', v);
+                    await GestureChannel.setSmartWakePreference(v);
+                  },
+                  activeThumbColor: cs.surface,
+                  activeTrackColor: AppColorsShared.accent,
                 ),
               ),
               _SettingsRow(
@@ -201,19 +281,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               _SettingsRow(
-                label: 'Sound Effects',
+                label: 'Click Sound on Gesture',
                 trailing: Switch(
                   value: _sounds,
-                  onChanged: (v) => setState(() => _sounds = v),
+                  onChanged: (v) async {
+                    setState(() => _sounds = v);
+                    await _setBool('sounds_enabled', v);
+                    await GestureChannel.setSoundsEnabled(v);
+                  },
                   activeThumbColor: cs.surface,
                   activeTrackColor: AppColorsShared.accent,
                 ),
               ),
               _SettingsRow(
-                label: 'Do Not Disturb',
+                label: 'Pause During Do Not Disturb',
                 trailing: Switch(
                   value: _dnd,
-                  onChanged: (v) => setState(() => _dnd = v),
+                  onChanged: (v) async {
+                    setState(() => _dnd = v);
+                    await _setBool('pause_in_dnd', v);
+                    await GestureChannel.setPauseInDnd(v);
+                  },
                   activeThumbColor: cs.surface,
                   activeTrackColor: AppColorsShared.accent,
                 ),
@@ -302,10 +390,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () => Navigator.of(context).pushNamed(AppRoutes.calibration),
               ),
-              _SettingsRow(
-                label: 'Spatial Camera',
-                trailing: Text('Allowed', style: TextStyle(color: cs.onSurfaceVariant)),
+              _PermissionRow(
+                label: 'Camera',
+                granted: _cameraGranted,
+                onFix: () async {
+                  final status = await Permission.camera.request();
+                  if (status.isPermanentlyDenied) await openAppSettings();
+                  _refreshPermissions();
+                },
+              ),
+              _PermissionRow(
+                label: 'Accessibility Service',
+                granted: _accessibilityOn,
+                onFix: () => AppSettings.openAppSettings(type: AppSettingsType.accessibility),
+              ),
+              _PermissionRow(
+                label: 'Usage Access (per-app profiles)',
+                granted: _usageAccessOn,
+                onFix: GestureChannel.openUsageAccessSettings,
+              ),
+              _PermissionRow(
+                label: 'Display Over Other Apps',
+                granted: _overlayGranted,
                 showDivider: false,
+                onFix: () async {
+                  await Permission.systemAlertWindow.request();
+                  _refreshPermissions();
+                },
               ),
             ],
           ),
@@ -315,16 +426,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 12),
           _SettingsCard(
             title: 'Help & Tutorials',
-            subtitle: 'Learn how to use Spartial Touch',
+            subtitle: 'Learn how to use SpatialTouch',
             icon: Icons.help_outline_rounded,
-            onTap: () {},
+            onTap: () => Navigator.of(context).pushNamed(AppRoutes.help),
           ),
           const SizedBox(height: 12),
           _SettingsCard(
             title: 'About',
-            subtitle: 'Version 1.0.0',
+            subtitle: 'Version $kAppVersion',
             icon: Icons.info_outline_rounded,
-            onTap: () {},
+            onTap: () => Navigator.of(context).pushNamed(AppRoutes.about),
           ),
           const SizedBox(height: 12),
           _SettingsCard(
@@ -336,6 +447,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 32),
         ],
       ),
+    );
+  }
+}
+
+/// A permission's real state, with a one-tap way to fix it when it's missing.
+class _PermissionRow extends StatelessWidget {
+  const _PermissionRow({
+    required this.label,
+    required this.granted,
+    required this.onFix,
+    this.showDivider = true,
+  });
+
+  final String label;
+  final bool granted;
+  final VoidCallback onFix;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return _SettingsRow(
+      label: label,
+      showDivider: showDivider,
+      onTap: granted ? null : onFix,
+      trailing: granted
+          ? Text('Allowed', style: TextStyle(color: cs.onSurfaceVariant))
+          : const Text('Enable',
+              style: TextStyle(color: AppColorsShared.accent, fontWeight: FontWeight.w700)),
     );
   }
 }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../home/home_screen.dart';
 import '../profile/profile_screen.dart';
 import '../gestures/gesture_library_screen.dart';
-import '../settings/settings_screen.dart';
+import '../monitor/live_monitor_screen.dart';
 
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
@@ -18,12 +18,12 @@ class _ShellScreenState extends State<ShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 0 = Home, 1 = Gestures, 2 = Live, 3 = Settings
     final tabs = [
       HomeScreen(onNavigateToTab: _selectTab),
       const GestureLibraryScreen(),
-      const SettingsScreen(),
-      const ProfileScreen(),
-      
+      const LiveMonitorScreen(),
+      ProfileScreen(onNavigateToTab: _selectTab),
     ];
 
     return Scaffold(
