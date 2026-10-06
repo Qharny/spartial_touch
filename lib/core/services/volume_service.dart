@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 
 class VolumeService {
-  static const MethodChannel _channel = MethodChannel('com.example.spartial_touch/volume');
+  static const MethodChannel _channel = MethodChannel('kabuteyy.spartial_touch/volume');
 
   static Future<void> volumeUp() async {
     try {

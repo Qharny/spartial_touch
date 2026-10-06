@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'app_colors.dart';
 import 'app_text_theme.dart';
 
-/// SpartialTouch — Master ThemeData
+/// SpatialTouch — Master ThemeData
 abstract final class AppTheme {
   static ThemeData get light => _buildLight();
   static ThemeData get dark => _buildDark();

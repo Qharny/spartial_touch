@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 

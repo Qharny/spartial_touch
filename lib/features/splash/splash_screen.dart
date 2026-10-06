@@ -136,7 +136,7 @@ class _SplashScreenState extends State<SplashScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Spartial Touch',
+                        'SpatialTouch',
                         style: tt.headlineMedium!
                             .copyWith(letterSpacing: -0.5),
                       ),

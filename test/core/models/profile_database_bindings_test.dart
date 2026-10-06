@@ -11,7 +11,7 @@ void main() {
   sqfliteFfiInit();
   databaseFactory = databaseFactoryFfi;
 
-  const channel = MethodChannel('com.example.spartial_touch/gestures');
+  const channel = MethodChannel('kabuteyy.spartial_touch/gestures');
   late List<Map<String, Map<String, String>>> pushes;
 
   /// The last full profile set pushed to the native ActionDispatcher.

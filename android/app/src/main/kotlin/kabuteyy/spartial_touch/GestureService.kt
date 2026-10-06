@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import android.app.Notification
 import android.app.NotificationChannel

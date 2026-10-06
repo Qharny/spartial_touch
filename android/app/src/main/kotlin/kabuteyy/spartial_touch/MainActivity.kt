@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import android.content.Intent
 import android.os.Bundle
@@ -9,10 +9,10 @@ import io.flutter.plugin.common.EventChannel
 
 class MainActivity : FlutterActivity() {
     companion object {
-        const val GESTURE_CHANNEL = "com.example.spartial_touch/gestures"
-        const val GESTURE_EVENT_CHANNEL = "com.example.spartial_touch/gesture_events"
-        const val CAMERA_FRAME_CHANNEL = "com.example.spartial_touch/camera_frames"
-        const val VOLUME_CHANNEL = "com.example.spartial_touch/volume"
+        const val GESTURE_CHANNEL = "kabuteyy.spartial_touch/gestures"
+        const val GESTURE_EVENT_CHANNEL = "kabuteyy.spartial_touch/gesture_events"
+        const val CAMERA_FRAME_CHANNEL = "kabuteyy.spartial_touch/camera_frames"
+        const val VOLUME_CHANNEL = "kabuteyy.spartial_touch/volume"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

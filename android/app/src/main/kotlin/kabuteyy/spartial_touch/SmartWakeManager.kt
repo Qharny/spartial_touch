@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import android.content.Context
 import android.hardware.Sensor

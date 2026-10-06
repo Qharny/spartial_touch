@@ -6,7 +6,7 @@ import 'package:spartial_touch/core/services/gesture_channel.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('com.example.spartial_touch/gestures');
+  const channel = MethodChannel('kabuteyy.spartial_touch/gestures');
 
   // Collect all MethodCall invocations for assertion.
   final List<MethodCall> capturedCalls = [];
