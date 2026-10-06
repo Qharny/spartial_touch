@@ -25,8 +25,18 @@ class BackgroundCameraManager(
 ) : LifecycleOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this)
-    private var cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    // One executor for the manager's whole life: stop()/start() pairs used to shut it down and
+    // recreate it, and a start() racing a pending stop() could bind an analyzer to an executor
+    // that was about to be (or already) shut down, silently stalling every frame.
+    private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var imageAnalyzer: ImageAnalysis? = null
+
+    // The most recently requested state. start()/stop() only record intent; the actual
+    // bind/unbind runs later on the main executor, and each callback re-checks this so the
+    // LAST call always wins — rapid SmartWake wake/sleep flapping can no longer interleave a
+    // stale bind after a newer unbind (or vice versa).
+    private var wantRunning = false
+    private var released = false
 
     init {
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
@@ -35,73 +45,88 @@ class BackgroundCameraManager(
     override val lifecycle: Lifecycle
         get() = lifecycleRegistry
 
+    /** Must be called on the main thread. */
     fun start() {
-        if (cameraExecutor.isShutdown) {
-            cameraExecutor = Executors.newSingleThreadExecutor()
-        }
-        lifecycleRegistry.currentState = Lifecycle.State.STARTED
+        if (released) return
+        wantRunning = true
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
         cameraProviderFuture.addListener({
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+            if (!wantRunning || released || imageAnalyzer != null) return@addListener
+            val cameraProvider: ProcessCameraProvider = try {
+                cameraProviderFuture.get()
+            } catch (e: Exception) {
+                Log.e("BackgroundCameraManager", "Camera provider unavailable", e)
+                return@addListener
+            }
 
-            imageAnalyzer = ImageAnalysis.Builder()
+            val analyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        // An uncaught exception here (OOM during JPEG compression, a buffer
-                        // closed concurrently, etc.) would crash the whole app — Android
-                        // kills the process for an uncaught exception on ANY thread, not just
-                        // main. imageProxy.close() must also always run, or CameraX's
-                        // STRATEGY_KEEP_ONLY_LATEST backpressure stalls waiting on a buffer
-                        // that never gets released.
-                        try {
-                            val (bitmap, bytes) = imageProxy.image?.toBitmapAndBytes() ?: Pair(null, null)
-                            val timestampNs = imageProxy.imageInfo.timestamp
-                            val timestampMs = timestampNs / 1_000_000
-                            if (bitmap != null && bytes != null) {
-                                onFrame(bitmap, bytes, timestampMs)
-                            }
-                        } catch (e: Exception) {
-                            Log.e("BackgroundCameraManager", "Frame processing failed", e)
-                        } finally {
-                            imageProxy.close()
-                        }
+            analyzer.setAnalyzer(cameraExecutor) { imageProxy ->
+                // An uncaught exception here (OOM during JPEG compression, a buffer
+                // closed concurrently, etc.) would crash the whole app — Android
+                // kills the process for an uncaught exception on ANY thread, not just
+                // main. imageProxy.close() must also always run, or CameraX's
+                // STRATEGY_KEEP_ONLY_LATEST backpressure stalls waiting on a buffer
+                // that never gets released.
+                try {
+                    val (bitmap, bytes) = imageProxy.image?.toBitmapAndBytes() ?: Pair(null, null)
+                    val timestampMs = imageProxy.imageInfo.timestamp / 1_000_000
+                    if (bitmap != null && bytes != null) {
+                        onFrame(bitmap, bytes, timestampMs)
                     }
+                } catch (e: Exception) {
+                    Log.e("BackgroundCameraManager", "Frame processing failed", e)
+                } finally {
+                    imageProxy.close()
                 }
-
-            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
+            }
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this, cameraSelector, imageAnalyzer
-                )
+                lifecycleRegistry.currentState = Lifecycle.State.STARTED
+                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, analyzer)
                 lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+                imageAnalyzer = analyzer
             } catch (exc: Exception) {
                 Log.e("BackgroundCameraManager", "Use case binding failed", exc)
+                analyzer.clearAnalyzer()
+                lifecycleRegistry.currentState = Lifecycle.State.CREATED
             }
-
         }, ContextCompat.getMainExecutor(context))
     }
 
+    /**
+     * Must be called on the main thread. Never blocks: stop() is called from SmartWakeManager's
+     * sensor callback on the main thread, where a synchronous provider .get() risked an ANR.
+     */
     fun stop() {
-        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        wantRunning = false
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        // stop() is called from SmartWakeManager's sensor callback, which runs on the main
-        // thread (registered with no Handler) — a blocking .get() here risked an ANR. Mirror
-        // start()'s async addListener pattern instead; the executor is only shut down once
-        // unbindAll() actually completes, so no frame can be submitted to it in between.
         cameraProviderFuture.addListener({
+            // A start() issued after this stop() supersedes it.
+            if (wantRunning && !released) return@addListener
             try {
                 cameraProviderFuture.get().unbindAll()
             } catch (e: Exception) {
                 Log.e("BackgroundCameraManager", "unbindAll failed during stop()", e)
-            } finally {
+            }
+            imageAnalyzer?.clearAnalyzer()
+            imageAnalyzer = null
+            // CREATED, not DESTROYED: DESTROYED is terminal for a LifecycleRegistry, so the next
+            // start() could never move it back to STARTED.
+            lifecycleRegistry.currentState = Lifecycle.State.CREATED
+            if (released) {
+                lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
                 cameraExecutor.shutdown()
             }
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    /** Stops the camera for good and frees the analysis thread. Call from Service.onDestroy(). */
+    fun release() {
+        released = true
+        stop()
     }
 
     private fun Image.toBitmapAndBytes(): Pair<Bitmap?, ByteArray?> {

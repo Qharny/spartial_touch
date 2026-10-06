@@ -12,8 +12,10 @@ class MainActivity : FlutterActivity() {
         const val GESTURE_CHANNEL = "kabuteyy.spartial_touch/gestures"
         const val GESTURE_EVENT_CHANNEL = "kabuteyy.spartial_touch/gesture_events"
         const val CAMERA_FRAME_CHANNEL = "kabuteyy.spartial_touch/camera_frames"
-        const val VOLUME_CHANNEL = "kabuteyy.spartial_touch/volume"
+        const val LANDMARK_CHANNEL = "kabuteyy.spartial_touch/landmarks"
     }
+
+    private val prefs by lazy { getSharedPreferences(GestureService.PREFS, MODE_PRIVATE) }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -40,6 +42,19 @@ class MainActivity : FlutterActivity() {
 
                 override fun onCancel(arguments: Any?) {
                     CameraFrameEventBus.eventSink = null
+                }
+            }
+        )
+
+        // Raw hand landmarks, only streamed while the custom-gesture recorder listens.
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, LANDMARK_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    LandmarkEventBus.eventSink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    LandmarkEventBus.eventSink = null
                 }
             }
         )
@@ -103,7 +118,7 @@ class MainActivity : FlutterActivity() {
                         val cooldownMs = args?.get("cooldownMs") ?: 800
                         GestureInterpreter.applyCooldown(cooldownMs.toLong())
                         // Persist fps and cooldown for BackgroundCameraManager and GestureInterpreter to read on next start
-                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                        prefs
                             .edit()
                             .putInt("detection_fps", fps)
                             .putLong("cooldown_ms", cooldownMs.toLong())
@@ -116,7 +131,7 @@ class MainActivity : FlutterActivity() {
                         val confidence = (args?.get("confidenceThreshold") as? Double)?.toFloat() ?: 0.75f
                         val motion = (args?.get("motionThreshold") as? Double)?.toFloat() ?: 0.12f
                         GestureInterpreter.applyCalibration(confidence, motion)
-                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                        prefs
                             .edit()
                             .putFloat("confidence_threshold", confidence)
                             .putFloat("motion_threshold", motion)
@@ -125,7 +140,7 @@ class MainActivity : FlutterActivity() {
                     }
                     "setHapticsEnabled" -> {
                         val enabled = call.arguments as? Boolean ?: true
-                        getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                        prefs
                             .edit().putBoolean("haptics_enabled", enabled).apply()
                         result.success(null)
                     }
@@ -136,7 +151,7 @@ class MainActivity : FlutterActivity() {
                     }
                     "getServiceStats" -> {
                         val service = GestureService.instance
-                        val prefs = getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+
                         val totalGestures = prefs.getInt("total_gesture_count", 0)
                         
                         val activeProfile = if (service != null) {
@@ -145,10 +160,16 @@ class MainActivity : FlutterActivity() {
                             "Standby"
                         }
 
+                        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                            .format(java.util.Date())
+                        val todayGestures =
+                            if (prefs.getString("today_date", null) == today) prefs.getInt("today_count", 0) else 0
+
                         val stats = mapOf(
                             "activeProfile" to activeProfile,
                             "totalGestures" to totalGestures,
-                            "impact" to String.format("%.1f%%", Math.min(99.9, totalGestures * 0.08))
+                            "todayGestures" to todayGestures,
+                            "pausedBySchedule" to (service?.isPausedBySchedule() ?: false)
                         )
                         result.success(stats)
                     }
@@ -157,11 +178,77 @@ class MainActivity : FlutterActivity() {
                         val key = args?.get("gestureKey") as? String
                         val enabled = args?.get("enabled") as? Boolean ?: true
                         if (key != null) {
-                            getSharedPreferences("spatialtouch_prefs", MODE_PRIVATE)
+                            prefs
                                 .edit()
                                 .putBoolean("gesture_enabled_$key", enabled)
                                 .apply()
                         }
+                        result.success(null)
+                    }
+                    "setServiceEnabled" -> {
+                        // The user's on/off intent — read by BootReceiver after a restart.
+                        prefs.edit().putBoolean("service_enabled", call.arguments as? Boolean ?: false).apply()
+                        result.success(null)
+                    }
+                    "isServiceRunning" -> {
+                        result.success(GestureService.instance != null)
+                    }
+                    "setOverlaySettings" -> {
+                        val args = call.arguments as? Map<*, *>
+                        prefs.edit()
+                            .putBoolean("overlay_enabled", args?.get("enabled") as? Boolean ?: true)
+                            .putFloat("overlay_opacity", ((args?.get("opacity") as? Number)?.toFloat() ?: 0.8f))
+                            .apply()
+                        GestureService.instance?.applyOverlaySettings()
+                        result.success(null)
+                    }
+                    "setSoundsEnabled" -> {
+                        prefs.edit().putBoolean("sounds_enabled", call.arguments as? Boolean ?: false).apply()
+                        result.success(null)
+                    }
+                    "setPauseInDnd" -> {
+                        prefs.edit().putBoolean("pause_in_dnd", call.arguments as? Boolean ?: true).apply()
+                        result.success(null)
+                    }
+                    "setSmartWakePreference" -> {
+                        // The user setting (battery saver), distinct from setSmartWakeEnabled,
+                        // which testing screens use to force the camera on temporarily.
+                        prefs.edit().putBoolean("smart_wake_enabled", call.arguments as? Boolean ?: true).apply()
+                        GestureService.instance?.refreshSchedule()
+                        result.success(null)
+                    }
+                    "setActiveHours" -> {
+                        val args = call.arguments as? Map<*, *>
+                        prefs.edit()
+                            .putBoolean("active_hours_enabled", args?.get("enabled") as? Boolean ?: false)
+                            .putInt("active_hours_start", (args?.get("startMinutes") as? Number)?.toInt() ?: 8 * 60)
+                            .putInt("active_hours_end", (args?.get("endMinutes") as? Number)?.toInt() ?: 22 * 60)
+                            .apply()
+                        GestureService.instance?.refreshSchedule()
+                        result.success(null)
+                    }
+                    "setGestureSensitivity" -> {
+                        val args = call.arguments as? Map<*, *>
+                        val key = args?.get("gestureKey") as? String
+                        val value = (args?.get("value") as? Number)?.toFloat()
+                        if (key == null || value == null) {
+                            result.error("INVALID_ARGUMENT", "Expected {gestureKey, value}", null)
+                        } else {
+                            prefs.edit().putFloat("gesture_sensitivity_$key", value).apply()
+                            GestureInterpreter.applySensitivity(key, value)
+                            result.success(null)
+                        }
+                    }
+                    "setCustomPoses" -> {
+                        // Argument: {"json": "[{key, samples}]", "names": {key: displayName}}
+                        val args = call.arguments as? Map<*, *>
+                        val json = args?.get("json") as? String ?: "[]"
+                        val names = args?.get("names") as? Map<*, *> ?: emptyMap<String, String>()
+                        val editor = prefs.edit().putString("custom_poses_json", json)
+                        prefs.all.keys.filter { it.startsWith("gesture_name_") }.forEach { editor.remove(it) }
+                        names.forEach { (k, v) -> if (k is String && v is String) editor.putString("gesture_name_$k", v) }
+                        editor.apply()
+                        CustomPoseMatcher.setPoses(CustomPoseMatcher.parse(json))
                         result.success(null)
                     }
                     "isAccessibilityServiceEnabled" -> {
@@ -180,20 +267,6 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
-
-        // Set up MethodChannel for Volume Control
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VOLUME_CHANNEL).setMethodCallHandler { call, result ->
-            val audioManager = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
-            if (call.method == "volumeUp") {
-                audioManager.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_RAISE, android.media.AudioManager.FLAG_SHOW_UI)
-                result.success(null)
-            } else if (call.method == "volumeDown") {
-                audioManager.adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_LOWER, android.media.AudioManager.FLAG_SHOW_UI)
-                result.success(null)
-            } else {
-                result.notImplemented()
-            }
-        }
     }
 
     /**

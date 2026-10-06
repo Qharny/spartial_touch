@@ -39,6 +39,17 @@ class OverlayManager(private val context: Context) {
     private var currentAnimator: ValueAnimator? = null
     private var pulseAnimator: ObjectAnimator? = null
 
+    // 0.2–1.0, from the "Overlay Opacity" setting.
+    private var opacity = 1f
+
+    /** Applies the overlay opacity setting, now and for any overlay built later. */
+    fun setOpacity(value: Float) {
+        handler.post {
+            opacity = value.coerceIn(0.2f, 1f)
+            overlayView?.alpha = opacity
+        }
+    }
+
     private val resetRunnable = Runnable {
         setActive()
     }
@@ -204,6 +215,7 @@ class OverlayManager(private val context: Context) {
 
         params = lp
         try {
+            container.alpha = opacity
             windowManager.addView(container, lp)
             overlayView = container
         } catch (e: Exception) {

@@ -35,6 +35,9 @@ class SmartWakeManager(
 
     fun isWakeState(): Boolean = isWake
 
+    /** Without a proximity sensor there's nothing to wake on, so the camera stays on. */
+    fun hasProximitySensor(): Boolean = proximitySensor != null
+
     fun start() {
         proximitySensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
