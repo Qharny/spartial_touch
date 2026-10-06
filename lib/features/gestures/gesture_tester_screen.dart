@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../main.dart';
 import '../../core/services/gesture_channel.dart';
-import '../../core/services/volume_service.dart';
+import '../../core/router/router.dart';
 
 class GestureTesterScreen extends StatefulWidget {
   const GestureTesterScreen({super.key});
@@ -35,11 +35,9 @@ class _GestureTesterScreenState extends State<GestureTesterScreen> {
             _detectedGesture = event.name;
             _confidence = event.confidence;
           });
-          if (event.name == 'Wave Up') {
-            VolumeService.volumeUp();
-          } else if (event.name == 'Wave Down') {
-            VolumeService.volumeDown();
-          }
+          // No actions here: the service already dispatches each gesture's
+          // assigned action. This used to also change the volume on every
+          // Wave Up/Down, doubling up with whatever the gesture was mapped to.
         }
       });
     } else {
@@ -71,9 +69,13 @@ class _GestureTesterScreenState extends State<GestureTesterScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF7A7890)),
-            onPressed: () {},
+            onSelected: (route) => Navigator.of(context).pushNamed(route),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: AppRoutes.calibration, child: Text('Recalibrate')),
+              PopupMenuItem(value: AppRoutes.help, child: Text('Help')),
+            ],
           ),
         ],
       ),
