@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 
@@ -38,12 +38,36 @@ object GestureInterpreter {
         motionThreshold = motionThresholdValue
     }
 
+    // Per-gesture sensitivity, 0..1 (0.5 = calibrated default). Swapped as an immutable
+    // snapshot for the same cross-thread reason as the fields above.
+    @Volatile private var sensitivity: Map<String, Float> = emptyMap()
+
+    /** Called from MainActivity / GestureService when a gesture's sensitivity slider changes. */
+    fun applySensitivity(gestureKey: String, value: Float) {
+        sensitivity = sensitivity + (gestureKey to value.coerceIn(0f, 1f))
+    }
+
+    fun sensitivityFor(gestureKey: String): Float = sensitivity[gestureKey] ?: 0.5f
+
+    /** Higher sensitivity → a shorter hand movement is enough (0.5x–1.5x the calibrated value). */
+    fun motionThresholdFor(gestureKey: String): Float =
+        motionThreshold * (1.5f - sensitivityFor(gestureKey))
+
+    /** Higher sensitivity → a less confident detection is accepted (±0.15 around calibration). */
+    fun confidenceFor(gestureKey: String): Float =
+        (minConfidence + (0.5f - sensitivityFor(gestureKey)) * 0.3f).coerceIn(0.4f, 0.98f)
+
+    /** Match radius for a custom pose: 0.5x–1.5x the base radius. */
+    fun poseThresholdFor(gestureKey: String): Float =
+        CustomPoseMatcher.BASE_MATCH_THRESHOLD * (0.5f + sensitivityFor(gestureKey))
+
     // Hold gesture tracking (Open Palm Hold)
     private var openPalmStartTime = 0L
     private const val HOLD_DURATION_MS = 1200L
 
     fun interpret(landmarks: List<NormalizedLandmark>, confidence: Float): String? {
-        if (confidence < minConfidence) return null
+        // Cheapest gate first: below the most permissive per-gesture threshold nothing can fire.
+        if (confidence < (minConfidence - 0.15f).coerceAtLeast(0.4f)) return null
 
         val now = System.currentTimeMillis()
         // Gates FIRING only (below) — history keeps updating every frame regardless, so a
@@ -71,7 +95,9 @@ object GestureInterpreter {
         // Open Palm Hold: all 4 fingers extended + held for HOLD_DURATION_MS
         if (isOpenPalm(landmarks)) {
             if (openPalmStartTime == 0L) openPalmStartTime = now
-            if (!inCooldown && now - openPalmStartTime >= HOLD_DURATION_MS) {
+            if (!inCooldown && now - openPalmStartTime >= HOLD_DURATION_MS &&
+                confidence >= confidenceFor("OPEN_PALM_HOLD")
+            ) {
                 openPalmStartTime = 0L
                 return fire("OPEN_PALM_HOLD", confidence)
             }
@@ -80,6 +106,19 @@ object GestureInterpreter {
         }
 
         if (inCooldown) return null
+
+        // --- Custom poses (user-recorded) take priority over the built-in static poses ---
+        if (CustomPoseMatcher.hasPoses()) {
+            val norm = CustomPoseMatcher.normalize(flatten(landmarks))
+            if (norm != null) {
+                val match = CustomPoseMatcher.update(norm, ::poseThresholdFor)
+                if (match != null && confidence >= confidenceFor(match.first)) {
+                    wristHistory.clear()
+                    indexHistory.clear()
+                    return fire(match.first, minOf(confidence, match.second))
+                }
+            }
+        }
 
         // Need full history for motion gestures
         if (wristHistory.size < HISTORY_SIZE) return null
@@ -91,17 +130,17 @@ object GestureInterpreter {
 
         val gesture = when {
             // Wave directions
-            deltaY < -motionThreshold && Math.abs(deltaY) > Math.abs(deltaX) * 1.5f -> "WAVE_UP"
-            deltaY >  motionThreshold && Math.abs(deltaY) > Math.abs(deltaX) * 1.5f -> "WAVE_DOWN"
-            deltaX < -motionThreshold && Math.abs(deltaX) > Math.abs(deltaY) * 1.5f -> "WAVE_LEFT"
-            deltaX >  motionThreshold && Math.abs(deltaX) > Math.abs(deltaY) * 1.5f -> "WAVE_RIGHT"
+            deltaY < -motionThresholdFor("WAVE_UP") && Math.abs(deltaY) > Math.abs(deltaX) * 1.5f -> "WAVE_UP"
+            deltaY >  motionThresholdFor("WAVE_DOWN") && Math.abs(deltaY) > Math.abs(deltaX) * 1.5f -> "WAVE_DOWN"
+            deltaX < -motionThresholdFor("WAVE_LEFT") && Math.abs(deltaX) > Math.abs(deltaY) * 1.5f -> "WAVE_LEFT"
+            deltaX >  motionThresholdFor("WAVE_RIGHT") && Math.abs(deltaX) > Math.abs(deltaY) * 1.5f -> "WAVE_RIGHT"
 
             // Fist pump: wrist size (index-to-wrist dist) rapidly increases = hand punching forward
             isFistPump() -> "FIST_PUMP"
 
             // Two-finger swipes (must be detected before single-finger)
-            isTwoFingerExtended(landmarks) && deltaX > motionThreshold  -> "TWO_FINGER_SWIPE_RIGHT"
-            isTwoFingerExtended(landmarks) && deltaX < -motionThreshold -> "TWO_FINGER_SWIPE_LEFT"
+            isTwoFingerExtended(landmarks) && deltaX > motionThresholdFor("TWO_FINGER_SWIPE_RIGHT")  -> "TWO_FINGER_SWIPE_RIGHT"
+            isTwoFingerExtended(landmarks) && deltaX < -motionThresholdFor("TWO_FINGER_SWIPE_LEFT") -> "TWO_FINGER_SWIPE_LEFT"
 
             // Static poses
             isPinch(landmarks)       -> "PINCH"
@@ -113,7 +152,7 @@ object GestureInterpreter {
             else -> null
         }
 
-        if (gesture != null) {
+        if (gesture != null && confidence >= confidenceFor(gesture)) {
             wristHistory.clear()
             indexHistory.clear()
             return fire(gesture, confidence)
@@ -176,6 +215,16 @@ object GestureInterpreter {
         val older  = indexHistory.take(4).map { it.first }.average().toFloat()
         // Hand approaching camera = apparent size grows (index-wrist distance grows)
         return recent > older * 1.4f
+    }
+
+    /** Flattens landmarks to `[x0, y0, x1, y1, …]` — the format custom poses are stored in. */
+    fun flatten(lm: List<NormalizedLandmark>): FloatArray {
+        val out = FloatArray(lm.size * 2)
+        for (i in lm.indices) {
+            out[i * 2] = lm[i].x()
+            out[i * 2 + 1] = lm[i].y()
+        }
+        return out
     }
 
     private fun distance(a: NormalizedLandmark, b: NormalizedLandmark): Float {

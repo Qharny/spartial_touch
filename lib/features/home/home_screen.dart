@@ -13,7 +13,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.onNavigateToTab});
 
   /// Switches the parent shell to the given tab index
-  /// (0 = Home, 1 = Profiles, 2 = Gestures, 3 = Settings).
+  /// (0 = Home, 1 = Gestures, 2 = Live, 3 = Settings).
   final void Function(int index)? onNavigateToTab;
 
   @override
@@ -27,7 +27,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   String _profileName = 'Standby';
   int _gestureCount = 0;
-  String _impact = '0.0%';
+  int _todayCount = 0;
+  bool _pausedBySchedule = false;
   Timer? _statsTimer;
 
   @override
@@ -63,7 +64,8 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _profileName = _isActive ? (stats['activeProfile'] ?? 'Default') : 'Standby';
         _gestureCount = stats['totalGestures'] ?? 0;
-        _impact = stats['impact'] ?? '0.0%';
+        _todayCount = (stats['todayGestures'] as num?)?.toInt() ?? 0;
+        _pausedBySchedule = stats['pausedBySchedule'] == true;
       });
     }
   }
@@ -95,6 +97,10 @@ class _HomeScreenState extends State<HomeScreen>
         _showPermissionNeededSnackBar();
         return;
       }
+      // Android 13+: without this the service's status notification and the
+      // after-reboot "tap to resume" reminder are hidden. Optional — the service
+      // runs either way, so the result is ignored.
+      unawaited(Permission.notification.request());
     }
 
     setState(() {
@@ -113,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('gesture_service_enabled', nextState);
+    unawaited(GestureChannel.setServiceEnabled(nextState).catchError((_) {}));
 
     if (nextState) {
       try {
@@ -124,6 +131,7 @@ class _HomeScreenState extends State<HomeScreen>
         // Native side refused to start (e.g. permission revoked after the check above) —
         // undo the optimistic UI update rather than leaving a stale "active" toggle.
         await prefs.setBool('gesture_service_enabled', false);
+        unawaited(GestureChannel.setServiceEnabled(false).catchError((_) {}));
         if (mounted) {
           setState(() {
             _isActive = false;
@@ -175,8 +183,9 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.menu_rounded, color: cs.onSurface),
-            onPressed: () {},
+            tooltip: 'Help',
+            icon: Icon(Icons.help_outline_rounded, color: cs.onSurface),
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.help),
           ),
           const SizedBox(width: 8),
         ],
@@ -247,7 +256,11 @@ class _HomeScreenState extends State<HomeScreen>
                 fontWeight: FontWeight.w700,
                 color: _isActive ? AppColorsShared.accent : cs.onSurfaceVariant,
               ),
-              child: Text(_isActive ? 'SERVICE RUNNING' : 'SERVICE STANDBY'),
+              child: Text(!_isActive
+                  ? 'SERVICE STANDBY'
+                  : _pausedBySchedule
+                      ? 'PAUSED · OUTSIDE ACTIVE HOURS'
+                      : 'SERVICE RUNNING'),
             ),
 
             const SizedBox(height: 48),
@@ -273,8 +286,8 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(width: 12),
                 Expanded(
                   child: _StatTile(
-                    label: 'IMPACT',
-                    value: _impact,
+                    label: 'TODAY',
+                    value: _todayCount.toString(),
                     isActive: false,
                   ),
                 ),
@@ -353,7 +366,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: _QuickAccessCard(
                     icon: Icons.app_settings_alt_rounded,
                     title: 'Profiles',
-                    onTap: () => widget.onNavigateToTab?.call(1),
+                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.profileEditor),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -361,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: _QuickAccessCard(
                     icon: Icons.auto_awesome_motion_rounded,
                     title: 'Gestures',
-                    onTap: () => widget.onNavigateToTab?.call(2),
+                    onTap: () => widget.onNavigateToTab?.call(1),
                   ),
                 ),
                 const SizedBox(width: 12),

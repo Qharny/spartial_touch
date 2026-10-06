@@ -1,13 +1,14 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'gesture_channel.dart';
 
-/// Persists and enforces "active hours" — the daily time window during which
-/// the gesture service is allowed to run.
+/// Persists the "active hours" daily window and hands it to the native service,
+/// which pauses the camera outside the window.
 ///
-/// When outside the active window, [ActiveHoursScheduler] stops the service
-/// and starts a timer to restart it when the window opens again.
+/// The window used to be enforced by a Dart [Timer] that stopped and restarted
+/// the service. That timer died with the Flutter engine whenever the app's UI was
+/// closed, so active hours silently stopped working in the background; the
+/// service now checks the window itself.
 class ActiveHoursScheduler {
   ActiveHoursScheduler._();
   static final ActiveHoursScheduler instance = ActiveHoursScheduler._();
@@ -17,8 +18,6 @@ class ActiveHoursScheduler {
   static const _startMinKey  = 'active_hours_start_min';
   static const _endHourKey   = 'active_hours_end_hour';
   static const _endMinKey    = 'active_hours_end_min';
-
-  Timer? _checkTimer;
 
   // ── Persistence ─────────────────────────────────────────────────────────────
 
@@ -56,65 +55,30 @@ class ActiveHoursScheduler {
       p.setInt(_endHourKey,    end.hour),
       p.setInt(_endMinKey,     end.minute),
     ]);
-    // Restart the scheduler with new settings
-    await start_();
+    await _pushToNative();
   }
 
-  // ── Scheduler lifecycle ──────────────────────────────────────────────────────
+  // ── Service lifecycle ───────────────────────────────────────────────────────
 
-  /// Start the polling loop that checks every minute whether we are in the
-  /// active window and starts/stops the gesture service accordingly.
+  /// Pushes the window to the native service and starts it. A start failure
+  /// (e.g. CAMERA permission revoked) propagates to the caller — the Home
+  /// toggle needs to know so it can revert its UI.
   Future<void> start_() async {
-    _checkTimer?.cancel();
-    if (!await isEnabled()) {
-      // Active hours not configured — ensure service is running freely
-      await GestureChannel.startService();
-      return;
-    }
-    // Check immediately — let a failure here propagate to our caller (e.g. the Home
-    // screen toggle, which needs to know startup failed and revert its UI) — then
-    // poll every 60 seconds, where failures are swallowed since nothing is awaiting
-    // that tick and there's no UI to report back to.
-    await _check();
-    _checkTimer = Timer.periodic(
-      const Duration(seconds: 60),
-      (_) => _check().catchError((_) {}),
-    );
+    await _pushToNative();
+    await GestureChannel.startService();
   }
 
-  void stop() {
-    _checkTimer?.cancel();
-    _checkTimer = null;
-  }
+  /// Kept for callers that pair it with stopping the service; the native side
+  /// stops checking the window when the service stops.
+  void stop() {}
 
-  Future<void> _check() async {
-    final enabled = await isEnabled();
-    if (!enabled) return;
-
-    final now   = TimeOfDay.now();
+  Future<void> _pushToNative() async {
     final start = await getStartTime();
-    final end   = await getEndTime();
-
-    if (_isInWindow(now, start, end)) {
-      await GestureChannel.startService();
-    } else {
-      await GestureChannel.stopService();
-    }
-  }
-
-  /// Returns true if [now] falls within the [start]–[end] window.
-  /// Handles overnight windows (e.g. 22:00 – 06:00).
-  bool _isInWindow(TimeOfDay now, TimeOfDay start, TimeOfDay end) {
-    final nowMins   = now.hour   * 60 + now.minute;
-    final startMins = start.hour * 60 + start.minute;
-    final endMins   = end.hour   * 60 + end.minute;
-
-    if (startMins <= endMins) {
-      // Normal window: 08:00 – 22:00
-      return nowMins >= startMins && nowMins < endMins;
-    } else {
-      // Overnight window: 22:00 – 06:00
-      return nowMins >= startMins || nowMins < endMins;
-    }
+    final end = await getEndTime();
+    await GestureChannel.setActiveHours(
+      enabled: await isEnabled(),
+      startMinutes: start.hour * 60 + start.minute,
+      endMinutes: end.hour * 60 + end.minute,
+    );
   }
 }

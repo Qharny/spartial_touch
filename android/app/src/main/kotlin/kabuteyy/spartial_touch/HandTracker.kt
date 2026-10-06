@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -11,7 +11,9 @@ import android.util.Log
 
 class HandTracker(
     private val context: Context,
-    private val onGestureDetected: (String) -> Unit
+    private val onGestureDetected: (String) -> Unit,
+    /** Called for every frame in which a hand is visible (from MediaPipe's listener thread). */
+    private val onHandSeen: () -> Unit = {}
 ) {
     private var handLandmarker: HandLandmarker? = null
 
@@ -63,6 +65,7 @@ class HandTracker(
         if (result.landmarks().isEmpty()) return
 
         val landmarks = result.landmarks()[0] // first hand
+        onHandSeen()
 
         // Extract the hand presence confidence from MediaPipe result
         val confidence: Float = if (result.handedness().isNotEmpty() &&
@@ -72,7 +75,10 @@ class HandTracker(
             0f
         }
 
-        Log.d("HandTracker", "Hand detected! Confidence: $confidence")
+        // Raw landmarks only go to Flutter while the custom-gesture recorder is listening.
+        if (LandmarkEventBus.hasListener()) {
+            LandmarkEventBus.sendLandmarks(GestureInterpreter.flatten(landmarks), confidence)
+        }
 
         val gesture = GestureInterpreter.interpret(landmarks, confidence)
 

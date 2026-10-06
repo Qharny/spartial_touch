@@ -247,7 +247,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     // the real native state when the user returns to the app.
     await AppSettings.openAppSettings(type: AppSettingsType.accessibility);
     if (!mounted) return;
-    _snack('Enable SpartialTouch, then return here.');
+    _snack('Enable SpatialTouch, then return here.');
   }
 
   /// Queries whether SpatialTouchAccessibilityService is actually connected
@@ -382,7 +382,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                       fontFamily: 'Inter',
                                       decoration: TextDecoration.none,
                                     ),
-                                    child: const Text('SpartialTouch'),
+                                    child: const Text('SpatialTouch'),
                                   ),
                           ),
                         ),

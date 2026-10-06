@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -183,5 +183,31 @@ class GestureInterpreterTest {
         GestureInterpreter.applyCooldown(400L)
         GestureInterpreter.applyCalibration(0.80f, 0.16f)
         assertEquals(400L, getLongField("cooldownMs"))
+    }
+}
+class GestureSensitivityTest {
+    @org.junit.After
+    fun reset() {
+        GestureInterpreter.applyCalibration(0.75f, 0.12f)
+        GestureInterpreter.applySensitivity("WAVE_UP", 0.5f)
+    }
+
+    @Test
+    fun `default sensitivity keeps the calibrated thresholds`() {
+        assertEquals(0.12f, GestureInterpreter.motionThresholdFor("WAVE_UP"), 1e-6f)
+        assertEquals(0.75f, GestureInterpreter.confidenceFor("WAVE_UP"), 1e-6f)
+    }
+
+    @Test
+    fun `higher sensitivity lowers the motion and confidence needed`() {
+        GestureInterpreter.applySensitivity("WAVE_UP", 1f)
+        assertEquals(0.06f, GestureInterpreter.motionThresholdFor("WAVE_UP"), 1e-6f)
+        assertEquals(0.60f, GestureInterpreter.confidenceFor("WAVE_UP"), 1e-6f)
+    }
+
+    @Test
+    fun `sensitivity is clamped to 0 to 1`() {
+        GestureInterpreter.applySensitivity("WAVE_UP", 5f)
+        assertEquals(1f, GestureInterpreter.sensitivityFor("WAVE_UP"), 1e-6f)
     }
 }

@@ -3,13 +3,18 @@ import '../../core/theme/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
+import '../../core/models/custom_pose.dart';
 import '../../core/models/gesture_catalog.dart';
 import '../../core/models/profile.dart';
 import '../../core/models/profile_database.dart';
 
 // Gesture/action vocabulary lives in gesture_catalog.dart — keys must match
-// GestureInterpreter.kt / ActionDispatcher.kt exactly.
-const _availableGestures = kGestures;
+// GestureInterpreter.kt / ActionDispatcher.kt exactly. Recorded custom poses
+// are appended after the built-ins.
+List<(String, String)> get _availableGestures => [
+      ...kGestures,
+      for (final p in CustomPoseStore.instance.poses) (p.key, p.name),
+    ];
 
 class ProfileEditorScreen extends StatefulWidget {
   const ProfileEditorScreen({super.key});

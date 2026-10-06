@@ -4,7 +4,6 @@ import 'app_routes.dart';
 
 // ── Screen imports ────────────────────────────────────────────────────────────
 import '../../features/home/home_screen.dart';
-import '../../features/search/search_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/profile_editor_screen.dart';
 import '../../features/gestures/gesture_library_screen.dart';
@@ -12,13 +11,12 @@ import '../../features/gestures/gesture_detail_screen.dart';
 import '../../features/gestures/custom_gesture_screen.dart';
 import '../../features/gestures/gesture_tester_screen.dart';
 import '../../features/calibration/calibration_screen.dart';
-import '../../features/settings/settings_screen.dart';
 import '../../features/shell/shell_screen.dart';
 import '../../features/splash/splash_screen.dart';
-import '../../features/notifications/notifications_screen.dart';
-import '../../features/item_detail/item_detail_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/profile/privacy_screen.dart';
+import '../../features/help/help_screen.dart';
+import '../../features/help/about_screen.dart';
 
 /// Builds the [MaterialApp.onGenerateRoute] route table.
 ///
@@ -32,7 +30,6 @@ abstract final class AppRouter {
       AppRoutes.onboarding => _fade(const OnboardingScreen(), settings),
       AppRoutes.shell => _fadeSlide(const ShellScreen(), settings),
       AppRoutes.home => _fadeSlide(const HomeScreen(), settings),
-      AppRoutes.search => _fadeSlide(const SearchScreen(), settings),
       AppRoutes.profile => _fadeSlide(const ProfileScreen(), settings),
       AppRoutes.profileEditor => _slide(const ProfileEditorScreen(), settings),
       AppRoutes.gestureLibrary => _fadeSlide(const GestureLibraryScreen(), settings),
@@ -40,10 +37,10 @@ abstract final class AppRouter {
       AppRoutes.gestureDetail => _slide(const GestureDetailScreen(), settings),
       AppRoutes.gestureTester => _fade(const GestureTesterScreen(), settings),
       AppRoutes.calibration => _slide(const CalibrationScreen(), settings),
-      AppRoutes.settings => _slide(const SettingsScreen(), settings),
-      AppRoutes.notifications => _slide(const NotificationsScreen(), settings),
-      AppRoutes.itemDetail => _slide(const ItemDetailScreen(), settings),
+      AppRoutes.settings => _slide(const ProfileScreen(), settings),
       AppRoutes.privacy => _slide(const PrivacyScreen(), settings),
+      AppRoutes.help => _slide(const HelpScreen(), settings),
+      AppRoutes.about => _slide(const AboutScreen(), settings),
       _ => _notFound(settings),
     };
   }

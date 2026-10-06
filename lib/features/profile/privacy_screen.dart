@@ -71,7 +71,7 @@ class PrivacyScreen extends StatelessWidget {
           const SizedBox(height: 12),
           _PermissionCard(
             title: 'RECEIVE_BOOT_COMPLETED',
-            subtitle: 'Auto-start service on device boot (if user enables)',
+            subtitle: 'After a restart, show a "tap to resume" reminder if gesture control was on',
             sensitivity: 'Low',
             icon: Icons.power_settings_new_rounded,
           ),
@@ -81,6 +81,20 @@ class PrivacyScreen extends StatelessWidget {
             subtitle: 'Haptic feedback on gesture recognition',
             sensitivity: 'Low',
             icon: Icons.vibration_rounded,
+          ),
+          const SizedBox(height: 12),
+          _PermissionCard(
+            title: 'PACKAGE_USAGE_STATS',
+            subtitle: 'See which app is open so per-app gesture profiles apply. Only the current app name is read.',
+            sensitivity: 'Medium',
+            icon: Icons.apps_rounded,
+          ),
+          const SizedBox(height: 12),
+          _PermissionCard(
+            title: 'POST_NOTIFICATIONS',
+            subtitle: 'Show the service status notification and the resume reminder',
+            sensitivity: 'Low',
+            icon: Icons.notifications_none_rounded,
           ),
 
           const SizedBox(height: 40),

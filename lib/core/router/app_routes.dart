@@ -1,4 +1,4 @@
-/// SpartialTouch — Named Route Constants
+/// SpatialTouch — Named Route Constants
 abstract final class AppRoutes {
   // ── Root ─────────────────────────────────────────────────────────────────
   static const String splash = '/';
@@ -7,11 +7,9 @@ abstract final class AppRoutes {
 
   // ── Top-level ─────────────────────────────────────────────────────────────
   static const String home = '/home';
-  static const String search = '/search';
   static const String profile = '/profile';
 
   // ── Detail / Sub-pages ───────────────────────────────────────────────────
-  static const String itemDetail = '/item-detail';
   static const String profileEditor = '/profile-editor';
   static const String gestureLibrary = '/gesture-library';
   static const String customGesture = '/custom-gesture';
@@ -19,6 +17,7 @@ abstract final class AppRoutes {
   static const String gestureTester = '/gesture-tester';
   static const String calibration = '/calibration';
   static const String settings = '/settings';
-  static const String notifications = '/notifications';
   static const String privacy = '/privacy';
+  static const String help = '/help';
+  static const String about = '/about';
 }

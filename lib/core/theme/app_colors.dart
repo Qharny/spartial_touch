@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// SpartialTouch Design System — Color Tokens
+/// SpatialTouch Design System — Color Tokens
 ///
 /// Two palettes:
 ///   • **Light** – white backgrounds, dark text

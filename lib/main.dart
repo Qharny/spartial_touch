@@ -8,6 +8,7 @@ import 'core/theme/theme.dart';
 import 'core/services/gesture_recognition_service.dart';
 import 'core/services/active_hours_scheduler.dart';
 import 'core/models/profile_database.dart';
+import 'core/models/custom_pose.dart';
 
 final gestureRecognitionService = GestureRecognitionService();
 
@@ -27,6 +28,14 @@ void main() async {
     systemNavigationBarColor: Colors.white,
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
+
+  // Names for custom gesture events, and the poses the native matcher needs.
+  await CustomPoseStore.instance.load();
+  try {
+    await CustomPoseStore.instance.syncToNative();
+  } catch (_) {
+    // Native side not available (e.g. widget tests) — nothing to sync to.
+  }
 
   final prefs = await SharedPreferences.getInstance();
   final serviceEnabled = prefs.getBool('gesture_service_enabled') ?? false;
@@ -52,7 +61,7 @@ class SpartialTouchApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Spartial Touch',
+      title: 'SpatialTouch',
       debugShowCheckedModeBanner: false,
 
       // ── Theme ──────────────────────────────────────────────────────────

@@ -244,6 +244,15 @@ class ProfileDatabase {
     await syncToNative();
   }
 
+  /// Removes every assignment of [gestureKey] across all profiles — used when a
+  /// custom gesture is deleted, so no stale mapping points at a gesture that no
+  /// longer exists.
+  Future<void> deleteBindingsForGesture(String gestureKey) async {
+    final db = await _database;
+    await db.delete('gesture_mappings', where: 'gesture_key = ?', whereArgs: [gestureKey]);
+    await syncToNative();
+  }
+
   // ── Native sync ──────────────────────────────────────────────────────────────
 
   /// Pushes every enabled profile's enabled mappings to the native

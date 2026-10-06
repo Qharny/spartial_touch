@@ -1,4 +1,4 @@
-package com.example.spartial_touch
+package kabuteyy.spartial_touch
 
 import android.content.Context
 import android.hardware.Sensor
@@ -34,6 +34,9 @@ class SmartWakeManager(
     private var isWake = false
 
     fun isWakeState(): Boolean = isWake
+
+    /** Without a proximity sensor there's nothing to wake on, so the camera stays on. */
+    fun hasProximitySensor(): Boolean = proximitySensor != null
 
     fun start() {
         proximitySensor?.let {

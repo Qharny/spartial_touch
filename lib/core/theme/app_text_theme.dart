@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// SpartialTouch — Typography
+/// SpatialTouch — Typography
 ///
 /// Font family : Inter (via google_fonts)
 ///

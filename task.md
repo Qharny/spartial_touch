@@ -32,8 +32,18 @@ Known follow-up (not fixed, needs a device to validate): rapid SmartWake wake/sl
 - `[x]` **Performance Modes**: `PerformanceModeService` (3 presets, FPS/cooldown) reviewed — no issues found, already correct.
 - `[x]` **Haptic Feedback**: `HapticService.kt` reviewed — already correctly guards by API level and wraps every call in try/catch, no issues found.
 
+## Phase 5.5: Functional completion — done
+- `[x]` Package ID → `kabuteyy.spartial_touch`; release signing via `android/key.properties`; lint config fixed.
+- `[x]` Custom gestures are real: landmark recording, steadiness grading, on-device matching (`CustomPoseMatcher.kt`), assignable to actions.
+- `[x]` Per-gesture sensitivity, performance-preset FPS, overlay on/off + opacity, click sound, pause in DND, and Smart Wake toggle are wired to the engine.
+- `[x]` Smart Wake now keeps the camera on while a hand is visible (it used to stop as soon as the hand left proximity-sensor range).
+- `[x]` Active hours enforced natively (the Dart timer died with the UI). Reboot shows a "tap to resume" notification.
+- `[x]` Camera start/stop race fixed (last call wins; no DESTROYED-lifecycle restart failure).
+- `[x]` Testing screens no longer stop the user's running service on exit; shared event streams no longer cut each other off.
+- `[x]` Live tab, Help, About; dead buttons and template screens removed.
+
 ## Phase 6: Release (v1.0)
 - `[ ]` **Thorough Testing**: Test gesture accuracy across various lighting conditions and distances.
-- `[ ]` **Documentation**: Finalize README, privacy policy, and user guides.
+- `[x]` **Documentation**: README, `docs/PRIVACY_POLICY.md`, `docs/RELEASE.md`, user guide updated. Privacy policy still needs hosting at a public URL.
 - `[ ]` **Demo Materials**: Record promotional/demo videos showing the app in action.
 - `[ ]` **Play Store Deployment**: Submit the initial release to the Google Play Store.

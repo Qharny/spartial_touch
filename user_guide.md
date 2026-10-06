@@ -1,18 +1,18 @@
-# Spartial Touch - User Guide
+# SpatialTouch - User Guide
 
-Welcome to **Spartial Touch**! This guide will walk you through setting up, calibrating, and using the application to control your Android device using touchless air gestures.
+Welcome to **SpatialTouch**! This guide will walk you through setting up, calibrating, and using the application to control your Android device using touchless air gestures.
 
 ---
 
 ## 🚀 Quick Start Setup
 
-To get Spartial Touch up and running, follow these steps:
+To get SpatialTouch up and running, follow these steps:
 
 ### 1. Grant Android Permissions
-Spartial Touch operates in the background to inject touch inputs. When you launch the app, you will be prompted to grant three key permissions:
-*   **Camera Permission**: Used headlessly to track hand landmarks via Google MediaPipe. *Note: Spartial Touch does not save or transmit any video feed.*
+SpatialTouch operates in the background to inject touch inputs. When you launch the app, you will be prompted to grant three key permissions:
+*   **Camera Permission**: Used headlessly to track hand landmarks via Google MediaPipe. *Note: SpatialTouch does not save or transmit any video feed.*
 *   **System Alert Window (Overlay)**: Enables the status bubble on your screen so you know when the gesture engine is active.
-*   **Accessibility Service**: Allows the app to simulate physical taps, swipes, and system navigations (like Home and Back) touchlessly. Go to **Settings > Accessibility > Installed Services > Spartial Touch** and turn it **ON**.
+*   **Accessibility Service**: Allows the app to simulate physical taps, swipes, and system navigations (like Home and Back) touchlessly. Go to **Settings > Accessibility > Installed Services > SpatialTouch** and turn it **ON**.
 
 ### 2. Turn On the Service
 *   Open the app to the **Home Screen**.
@@ -23,7 +23,7 @@ Spartial Touch operates in the background to inject touch inputs. When you launc
 
 ## 🛠️ Calibration Wizard
 
-Before using Spartial Touch, we recommend running the calibration wizard to tailor detection to your environment.
+Before using SpatialTouch, we recommend running the calibration wizard to tailor detection to your environment.
 1.  Go to the **Settings** tab (represented by the cog icon / profile screen).
 2.  Expand **Calibration & Permissions** and tap **Redo Calibration**.
 3.  Position your device stably on a table or stand.
@@ -37,7 +37,7 @@ Before using Spartial Touch, we recommend running the calibration wizard to tail
 
 ## 🎨 Mapping Gestures to Actions
 
-Spartial Touch lets you map physical movements to device actions globally or for specific apps.
+SpatialTouch lets you map physical movements to device actions globally or for specific apps.
 
 ### Supported Gestures & Default Actions
 | Gesture | Physical Motion | Default Action | Difficulty |
@@ -59,17 +59,18 @@ Spartial Touch lets you map physical movements to device actions globally or for
 ### Customizing App Mappings
 *   Go to **Settings > Connected Apps**.
 *   Configure custom actions for apps like **TikTok, YouTube, Kindle**, etc. 
-*   When you open these apps, Spartial Touch will automatically detect the foreground package and swap mapping profiles instantly.
+*   When you open these apps, SpatialTouch will automatically detect the foreground package and swap mapping profiles instantly.
 
 ---
 
 ## 🔋 Battery & Scheduler Polish
 
-Spartial Touch runs natively in the background. To keep your device's battery healthy:
+SpatialTouch runs natively in the background. To keep your device's battery healthy:
 
 ### 1. Smart Wake Filter
-*   The camera feed is gated by proximity and motion sensors.
-*   The camera only wakes up and begins MediaPipe detection when your hand approaches the screen. It returns to sleep when you put your hand down.
+*   With **Smart Wake** on (Settings › Overlay & Performance), the camera stays off until your hand passes close to the phone's proximity sensor near the earpiece.
+*   It then stays on for as long as it can see a hand, and sleeps after 10 seconds without one.
+*   Phones without a proximity sensor keep the camera on while the service runs. Turn Smart Wake off if you'd rather never have to wake it.
 
 ### 2. Select a Performance Preset
 Expand **Overlay & Performance** in the Settings tab:
@@ -81,12 +82,21 @@ Expand **Overlay & Performance** in the Settings tab:
 Expand **Feedback & Schedule** in the Settings tab:
 *   Toggle **Enable Active Hours**.
 *   Select **Start Time** (e.g. 08:00 AM) and **End Time** (e.g. 10:00 PM).
-*   The background service will automatically turn off outside this window to conserve battery overnight.
+*   Outside this window the service pauses the camera (the notification says so) and resumes on its own when the window opens. This keeps working with the app closed.
 
 ---
 
+## ✋ Custom Gestures
+
+*   In the **Gestures** tab, tap **+** to record your own hand pose (e.g. a peace sign).
+*   Hold the pose still while each of the three samples records. Each sample is graded **Excellent**, **Good** or **Unsteady**.
+*   Test it on the last step, save it, then open it in the Gestures tab to assign an action, globally or per app.
+*   Custom gestures are static poses held for about half a second, not movements.
+
 ## 💡 Troubleshooting
 
-*   **Status overlay is red / sleeping**: Ensure the Accessibility Service is still turned on. Android sometimes battery-optimizes background services and shuts them off. Turn battery optimization to **"Unrestricted"** for Spartial Touch.
+*   **After restarting the phone**: Android doesn't let camera apps restart themselves on boot. Tap the **"SpatialTouch is paused"** notification to resume.
+
+*   **Status overlay is red / sleeping**: Ensure the Accessibility Service is still turned on. Android sometimes battery-optimizes background services and shuts them off. Turn battery optimization to **"Unrestricted"** for SpatialTouch.
 *   **Gestures are not registering**: Make sure you have enough ambient light. Standing directly under bright backlights (like a window behind you) can make it difficult for MediaPipe to separate your hand landmarks from the background.
 *   **Too many false actions**: Redo calibration and increase the **Confidence Threshold** to `0.80` or `0.85`.
